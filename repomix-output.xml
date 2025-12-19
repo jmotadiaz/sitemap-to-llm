@@ -1,0 +1,182 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+scripts/
+  extractFromJson.js
+  sitemap2json.js
+package.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="scripts/extractFromJson.js">
+const fs = require('fs');
+const path = require('path');
+
+// Verificar que se haya proporcionado la ruta del sitemap
+if (process.argv.length < 3) {
+  console.error('Uso: node sitemap-parser.js <ruta-al-sitemap.xml> [ruta-destino.json]');
+  process.exit(1);
+}
+
+const inputPath = process.argv[2];
+const pattern = process.argv[3];
+const outputParam = process.argv[4];
+
+console,log(process.cwd());
+
+const { urls, container } = JSON.parse(fs.readFileSync(path.join(process.cwd(), inputPath), 'utf8'));
+const filteredUrls = pattern ? urls.filter(url => url.includes(pattern)) : urls;
+
+const outputPath = outputParam || inputPath.replace(/\.json$/, `-${pattern.toLowerCase().replaceAll('/', '-')}.json`);
+
+fs.writeFile(path.join(process.cwd(), inputPath), JSON.stringify({ urls: filteredUrls, container }, null, 2), 'utf8', (err) => {
+  if (err) {
+    console.error(`Error al escribir el archivo JSON: ${err.message}`);
+    process.exit(1);
+  }
+
+  console.log(`Archivo JSON creado exitosamente: ${outputPath}`);
+});
+</file>
+
+<file path="scripts/sitemap2json.js">
+const fs = require('fs');
+const https = require('https');
+const http = require('http');
+const { URL } = require('url');
+const { input } = require('motion/react-client');
+
+// Verificar que se haya proporcionado la ruta del sitemap
+if (process.argv.length < 3) {
+  console.error('Uso: node sitemap-parser.js <ruta-al-sitemap.xml> [ruta-destino.json]');
+  process.exit(1);
+}
+
+const inputPath = process.argv[2];
+const outputPath = process.argv[3] || inputPath.replace(/\.xml$/, '.json');
+
+// Función para extraer URLs usando expresiones regulares
+function extractUrlsFromSitemap(xmlContent) {
+  const urls = [];
+  // Expresión regular para encontrar todas las etiquetas <loc>...</loc>
+  const urlRegex = /<loc>(.*?)<\/loc>/g;
+  let match;
+
+  while ((match = urlRegex.exec(xmlContent)) !== null) {
+    urls.push(match[1]);
+  }
+
+  return urls;
+}
+
+// Función para leer archivo local o descargar desde URL
+function getSitemapContent(pathOrUrl, callback) {
+  // Verificar si es una URL
+  try {
+    const urlObj = new URL(pathOrUrl);
+    const client = urlObj.protocol === 'https:' ? https : http;
+
+    client.get(pathOrUrl, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        callback(null, data);
+      });
+    }).on('error', (err) => {
+      callback(err, null);
+    });
+  } catch (err) {
+    // No es una URL, tratar como ruta de archivo local
+    fs.readFile(pathOrUrl, 'utf8', callback);
+  }
+}
+
+// Obtener el contenido del sitemap
+getSitemapContent(inputPath, (err, xmlContent) => {
+  if (err) {
+    console.error(`Error al obtener el sitemap: ${err.message}`);
+    process.exit(1);
+  }
+
+  // Extraer URLs
+  const urls = extractUrlsFromSitemap(xmlContent);
+
+  // Crear objeto JSON con la estructura solicitada
+  const jsonOutput = { urls };
+
+  // Escribir archivo JSON
+  fs.writeFile(outputPath, JSON.stringify(jsonOutput, null, 2), 'utf8', (err) => {
+    if (err) {
+      console.error(`Error al escribir el archivo JSON: ${err.message}`);
+      process.exit(1);
+    }
+
+    console.log(`Archivo JSON creado exitosamente: ${outputPath}`);
+    console.log(`Se extrajeron ${urls.length} URLs`);
+  });
+});
+</file>
+
+<file path="package.json">
+{
+  "name": "local-scripts",
+  "version": "1.0.0",
+  "main": "index.js",
+  "bin": {
+    "extract-from-json": "./scripts/extractFromJson.js",
+    "sitemap-to-json": "./scripts/sitemap2Json.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
+</file>
+
+</files>

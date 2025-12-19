@@ -1,0 +1,25 @@
+{
+  "name": "local-scripts",
+  "version": "1.0.0",
+  "main": "index.js",
+  "bin": {
+    "extract-from-json": "./scripts/extractFromJson.js",
+    "sitemap-to-json": "./scripts/sitemap2Json.js",
+    "sitemap-to-txt": "./scripts/sitemap2txt.js",
+    "sitemap-to-firecrawl": "./scripts/sitemap-to-firecrawl.js",
+    "sitemap-to-jina": "./scripts/sitemap-to-jina.js",
+    "web-to-md": "./scripts/web-to-md.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@mendable/firecrawl-js": "^1.21.1",
+    "dotenv": "^17.2.3",
+    "turndown": "^7.2.0"
+  }
+}
