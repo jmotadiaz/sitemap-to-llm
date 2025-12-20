@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 // Cargar variables de entorno desde la raíz del proyecto
 const scriptDir = __dirname || path.dirname(process.argv[1]);
 const projectRoot = path.resolve(scriptDir, '..');
-const BATCH_SIZE = 20;
+const BATCH_SIZE = 50;
 dotenv.config({ path: path.join(projectRoot, '.env') });
 
 // Verificar argumentos
@@ -166,42 +166,31 @@ function extractUrlsFromJson(jsonContent: string): string[] {
 }
 
 // Función para scrapear una URL usando Jina API (devuelve JSON con metadata)
-function scrapeWithJinaJson(url: string): Promise<JinaResponse> {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: 'r.jina.ai',
-      path: `/${encodeURIComponent(url)}`,
-      headers: {
-        'X-Return-Format': 'json',
-        'Authorization': `Bearer ${apiKey}`,
-        'Accept': 'application/json'
-      }
-    };
+async function scrapeWithJinaJson(url: string): Promise<JinaResponse> {
+  const requestUrl = `https://r.jina.ai/${encodeURIComponent(url)}`;
+  const headers = {
+    'X-Return-Format': 'json',
+    'Authorization': `Bearer ${apiKey}`,
+    'Accept': 'application/json'
+  };
 
-    https.get(options, (res) => {
-      if (res.statusCode !== 200) {
-        reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
-        return;
-      }
+  let response: Response;
+  try {
+    response = await fetch(requestUrl, { headers });
+  } catch (err) {
+    throw new Error(`Error de conexión: ${(err as Error).message}`);
+  }
 
-      let data = '';
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
 
-      res.on('data', (chunk: Buffer) => {
-        data += chunk;
-      });
-
-      res.on('end', () => {
-        try {
-          const jsonData = JSON.parse(data) as JinaResponse;
-          resolve(jsonData);
-        } catch (err) {
-          reject(new Error(`Error al parsear JSON: ${(err as Error).message}`));
-        }
-      });
-    }).on('error', (e) => {
-      reject(new Error(`Error de conexión: ${e.message}`));
-    });
-  });
+  try {
+    const jsonData = await response.json() as JinaResponse;
+    return jsonData;
+  } catch (err) {
+    throw new Error(`Error al parsear JSON: ${(err as Error).message}`);
+  }
 }
 
 // Función para extraer el último segmento de la URL
