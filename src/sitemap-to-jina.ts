@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const https = require('https');
-const http = require('http');
-const { URL } = require('url');
-const path = require('path');
+import fs from 'fs';
+import https from 'https';
+import http from 'http';
+import { URL } from 'url';
+import path from 'path';
+import dotenv from 'dotenv';
 
 // Cargar variables de entorno desde la raíz del proyecto
-const dotenv = require('dotenv');
-// Buscar .env en la raíz del proyecto (un nivel arriba del directorio scripts)
 const scriptDir = __dirname || path.dirname(process.argv[1]);
 const projectRoot = path.resolve(scriptDir, '..');
 dotenv.config({ path: path.join(projectRoot, '.env') });
@@ -29,10 +28,23 @@ if (!apiKey) {
   process.exit(1);
 }
 
+interface ProcessResult {
+  success: boolean;
+  url: string;
+  filename?: string;
+  error?: string;
+}
+
+interface JinaResponse {
+  title?: string;
+  metadata?: { title?: string };
+  data?: { title?: string };
+}
+
 // Función para convertir título a nombre de archivo
-function titleToFilename(title) {
+function titleToFilename(title: string | null): string {
   if (!title) return 'untitled';
-  
+
   return title
     .toLowerCase()
     .normalize('NFD')
@@ -44,11 +56,10 @@ function titleToFilename(title) {
 }
 
 // Función para extraer URLs usando expresiones regulares
-function extractUrlsFromSitemap(xmlContent) {
-  const urls = [];
-  // Expresión regular para encontrar todas las etiquetas <loc>...</loc>
+function extractUrlsFromSitemap(xmlContent: string): string[] {
+  const urls: string[] = [];
   const urlRegex = /<loc>(.*?)<\/loc>/g;
-  let match;
+  let match: RegExpExecArray | null;
 
   while ((match = urlRegex.exec(xmlContent)) !== null) {
     urls.push(match[1]);
@@ -58,16 +69,15 @@ function extractUrlsFromSitemap(xmlContent) {
 }
 
 // Función para leer archivo local o descargar desde URL
-function getSitemapContent(pathOrUrl) {
+function getSitemapContent(pathOrUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    // Verificar si es una URL
     try {
       const urlObj = new URL(pathOrUrl);
       const client = urlObj.protocol === 'https:' ? https : http;
 
       client.get(pathOrUrl, (res) => {
         // Manejar redirects
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           getSitemapContent(res.headers.location).then(resolve).catch(reject);
           return;
         }
@@ -78,14 +88,14 @@ function getSitemapContent(pathOrUrl) {
         }
 
         let data = '';
-        res.on('data', (chunk) => {
+        res.on('data', (chunk: Buffer) => {
           data += chunk;
         });
         res.on('end', () => {
           resolve(data);
         });
       }).on('error', reject);
-    } catch (err) {
+    } catch {
       // No es una URL, tratar como ruta de archivo local
       const fullPath = path.isAbsolute(pathOrUrl) ? pathOrUrl : path.join(process.cwd(), pathOrUrl);
       fs.readFile(fullPath, 'utf8', (err, data) => {
@@ -97,23 +107,23 @@ function getSitemapContent(pathOrUrl) {
 }
 
 // Función para extraer URLs desde JSON
-function extractUrlsFromJson(jsonContent) {
+function extractUrlsFromJson(jsonContent: string): string[] {
   try {
     const jsonData = JSON.parse(jsonContent);
     const { urls } = jsonData;
-    
+
     if (!Array.isArray(urls) || urls.length === 0) {
       return [];
     }
-    
+
     return urls;
-  } catch (err) {
+  } catch {
     return [];
   }
 }
 
 // Función para scrapear una URL usando Jina API (devuelve JSON con metadata)
-function scrapeWithJinaJson(url) {
+function scrapeWithJinaJson(url: string): Promise<JinaResponse> {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'r.jina.ai',
@@ -133,16 +143,16 @@ function scrapeWithJinaJson(url) {
 
       let data = '';
 
-      res.on('data', (chunk) => {
+      res.on('data', (chunk: Buffer) => {
         data += chunk;
       });
 
       res.on('end', () => {
         try {
-          const jsonData = JSON.parse(data);
+          const jsonData = JSON.parse(data) as JinaResponse;
           resolve(jsonData);
         } catch (err) {
-          reject(new Error(`Error al parsear JSON: ${err.message}`));
+          reject(new Error(`Error al parsear JSON: ${(err as Error).message}`));
         }
       });
     }).on('error', (e) => {
@@ -152,7 +162,7 @@ function scrapeWithJinaJson(url) {
 }
 
 // Función para scrapear una URL usando Jina API (devuelve markdown)
-function scrapeWithJinaMarkdown(url) {
+function scrapeWithJinaMarkdown(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'r.jina.ai',
@@ -171,7 +181,7 @@ function scrapeWithJinaMarkdown(url) {
 
       let data = '';
 
-      res.on('data', (chunk) => {
+      res.on('data', (chunk: Buffer) => {
         data += chunk;
       });
 
@@ -185,7 +195,7 @@ function scrapeWithJinaMarkdown(url) {
 }
 
 // Función para extraer el último segmento de la URL
-function getLastUrlSegment(url) {
+function getLastUrlSegment(url: string): string {
   try {
     const urlObj = new URL(url);
     const pathname = urlObj.pathname;
@@ -197,31 +207,33 @@ function getLastUrlSegment(url) {
       return lastSegment || 'index';
     }
     return 'index';
-  } catch (err) {
+  } catch {
     return 'untitled';
   }
 }
 
+let outDirFullPath: string;
+
 // Función para procesar una URL individual
-async function processUrl(url, index, total) {
+async function processUrl(url: string, index: number, total: number): Promise<ProcessResult> {
   try {
     console.log(`[${index + 1}/${total}] Procesando: ${url}`);
-    
+
     // Hacer ambas peticiones en paralelo: JSON para el título y markdown para el contenido
     const [jsonData, markdown] = await Promise.all([
-      scrapeWithJinaJson(url).catch((err) => {
+      scrapeWithJinaJson(url).catch((err: Error) => {
         console.error(`  ⚠ Error en petición JSON: ${err.message}`);
-        return {};
+        return {} as JinaResponse;
       }),
-      scrapeWithJinaMarkdown(url).catch((err) => {
+      scrapeWithJinaMarkdown(url).catch((err: Error) => {
         console.error(`  ⚠ Error en petición Markdown: ${err.message}`);
         return '';
       })
     ]);
-    
+
     // Extraer título del JSON
     const title = jsonData.title || jsonData.metadata?.title || jsonData.data?.title || null;
-    
+
     // Verificar que tenemos markdown
     if (!markdown || markdown.trim().length === 0) {
       throw new Error('No se obtuvo contenido markdown');
@@ -236,40 +248,38 @@ async function processUrl(url, index, total) {
     console.log(`  ✓ Guardado: ${filename}.md`);
     return { success: true, url, filename };
   } catch (err) {
-    console.error(`  ✗ Error: ${err.message}`);
-    return { success: false, url, error: err.message };
+    console.error(`  ✗ Error: ${(err as Error).message}`);
+    return { success: false, url, error: (err as Error).message };
   }
 }
 
 // Función para dividir array en chunks
-function chunkArray(array, chunkSize) {
-  const chunks = [];
+function chunkArray<T>(array: T[], chunkSize: number): T[][] {
+  const chunks: T[][] = [];
   for (let i = 0; i < array.length; i += chunkSize) {
     chunks.push(array.slice(i, i + chunkSize));
   }
   return chunks;
 }
 
-let outDirFullPath;
-
 // Función principal
-async function main() {
+async function main(): Promise<void> {
   // Leer el archivo de entrada (sitemap XML o JSON)
   const inputFullPath = path.isAbsolute(inputPath) ? inputPath : path.join(process.cwd(), inputPath);
   outDirFullPath = path.isAbsolute(outDir) ? outDir : path.join(process.cwd(), outDir);
 
-  let content;
+  let content: string;
   try {
     content = await getSitemapContent(inputFullPath);
   } catch (err) {
-    console.error(`Error al leer el archivo: ${err.message}`);
+    console.error(`Error al leer el archivo: ${(err as Error).message}`);
     process.exit(1);
   }
 
   // Determinar si es JSON o XML basándose en la extensión o contenido
   const isJson = inputPath.toLowerCase().endsWith('.json') || content.trim().startsWith('{');
-  let urls;
-  
+  let urls: string[];
+
   if (isJson) {
     urls = extractUrlsFromJson(content);
   } else {
@@ -297,7 +307,7 @@ async function main() {
   for (let chunkIndex = 0; chunkIndex < urlChunks.length; chunkIndex++) {
     const chunk = urlChunks[chunkIndex];
     const startIndex = chunkIndex * 10;
-    
+
     console.log(`\n📦 Procesando lote ${chunkIndex + 1}/${urlChunks.length} (${chunk.length} URLs)...`);
 
     // Procesar el chunk de 10 URLs concurrentemente
@@ -318,7 +328,7 @@ async function main() {
   console.log(`\n✅ Completado: ${successCount} exitosos, ${errorCount} errores`);
 }
 
-main().catch((err) => {
+main().catch((err: Error) => {
   console.error(`Error fatal: ${err.message}`);
   process.exit(1);
 });

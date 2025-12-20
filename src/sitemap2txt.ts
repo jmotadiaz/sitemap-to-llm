@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const https = require('https');
-const http = require('http');
-const { URL } = require('url');
-const path = require('path');
+import fs from 'fs';
+import https from 'https';
+import http from 'http';
+import { URL } from 'url';
+import path from 'path';
 
 // Verificar que se haya proporcionado la ruta del sitemap
 if (process.argv.length < 3) {
@@ -19,36 +19,35 @@ const inputPath = process.argv[2];
 const outputPath = process.argv[3] || inputPath.replace(/\.(xml|json)$/i, '.txt');
 
 // Detectar si el contenido es JSON
-function isJsonContent(content) {
+function isJsonContent(content: string): boolean {
   const trimmed = content.trim();
   return trimmed.startsWith('{') || trimmed.startsWith('[');
 }
 
 // Función para extraer URLs de JSON con formato {urls: string[]}
-function extractUrlsFromJson(jsonContent) {
+function extractUrlsFromJson(jsonContent: string): string[] {
   try {
     const data = JSON.parse(jsonContent);
     if (data.urls && Array.isArray(data.urls)) {
-      return data.urls.filter(url => typeof url === 'string' && url.length > 0);
+      return data.urls.filter((url: unknown) => typeof url === 'string' && (url as string).length > 0);
     }
     // Si es directamente un array de URLs
     if (Array.isArray(data)) {
-      return data.filter(url => typeof url === 'string' && url.length > 0);
+      return data.filter((url: unknown) => typeof url === 'string' && (url as string).length > 0);
     }
     console.error('Error: El JSON no tiene el formato esperado { "urls": [...] } o [...]');
     return [];
   } catch (err) {
-    console.error(`Error al parsear JSON: ${err.message}`);
+    console.error(`Error al parsear JSON: ${(err as Error).message}`);
     return [];
   }
 }
 
 // Función para extraer URLs de XML usando expresiones regulares
-function extractUrlsFromXml(xmlContent) {
-  const urls = [];
-  // Expresión regular para encontrar todas las etiquetas <loc>...</loc>
+function extractUrlsFromXml(xmlContent: string): string[] {
+  const urls: string[] = [];
   const urlRegex = /<loc>(.*?)<\/loc>/g;
-  let match;
+  let match: RegExpExecArray | null;
 
   while ((match = urlRegex.exec(xmlContent)) !== null) {
     urls.push(match[1]);
@@ -58,7 +57,7 @@ function extractUrlsFromXml(xmlContent) {
 }
 
 // Función para extraer URLs detectando el formato automáticamente
-function extractUrls(content) {
+function extractUrls(content: string): string[] {
   if (isJsonContent(content)) {
     console.log('Formato detectado: JSON');
     return extractUrlsFromJson(content);
@@ -69,7 +68,7 @@ function extractUrls(content) {
 }
 
 // Función para leer archivo local o descargar desde URL
-function getSitemapContent(pathOrUrl, callback) {
+function getSitemapContent(pathOrUrl: string, callback: (err: NodeJS.ErrnoException | null, data: string | null) => void): void {
   // Verificar si es una URL
   try {
     const urlObj = new URL(pathOrUrl);
@@ -77,7 +76,7 @@ function getSitemapContent(pathOrUrl, callback) {
 
     client.get(pathOrUrl, (res) => {
       let data = '';
-      res.on('data', (chunk) => {
+      res.on('data', (chunk: Buffer) => {
         data += chunk;
       });
       res.on('end', () => {
@@ -86,7 +85,7 @@ function getSitemapContent(pathOrUrl, callback) {
     }).on('error', (err) => {
       callback(err, null);
     });
-  } catch (err) {
+  } catch {
     // No es una URL, tratar como ruta de archivo local
     fs.readFile(path.join(process.cwd(), pathOrUrl), 'utf8', callback);
   }
@@ -100,7 +99,7 @@ getSitemapContent(inputPath, (err, content) => {
   }
 
   // Extraer URLs (detecta formato automáticamente)
-  const urls = extractUrls(content);
+  const urls = extractUrls(content!);
 
   // Verificar que se encontraron URLs
   if (urls.length === 0) {

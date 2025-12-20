@@ -1,16 +1,16 @@
 {
   "name": "local-scripts",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
   "bin": {
-    "extract-from-json": "./scripts/extractFromJson.js",
-    "sitemap-to-json": "./scripts/sitemap2Json.js",
-    "sitemap-to-txt": "./scripts/sitemap2txt.js",
-    "sitemap-to-firecrawl": "./scripts/sitemap-to-firecrawl.js",
-    "sitemap-to-jina": "./scripts/sitemap-to-jina.js",
-    "web-to-md": "./scripts/web-to-md.js"
+    "extract-from-json": "./dist/extractFromJson.js",
+    "sitemap-to-json": "./dist/sitemap2json.js",
+    "sitemap-to-txt": "./dist/sitemap2txt.js",
+    "sitemap-to-jina": "./dist/sitemap-to-jina.js",
+    "web-to-md": "./dist/web-to-md.js"
   },
   "scripts": {
+    "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -21,5 +21,10 @@
     "@mendable/firecrawl-js": "^1.21.1",
     "dotenv": "^17.2.3",
     "turndown": "^7.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/turndown": "^5.0.5",
+    "typescript": "^5.7.0"
   }
 }

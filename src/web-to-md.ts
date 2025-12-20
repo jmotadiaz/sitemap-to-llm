@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const https = require('https');
-const http = require('http');
-const { URL } = require('url');
-const path = require('path');
-const TurndownService = require('turndown');
+import fs from 'fs';
+import https from 'https';
+import http from 'http';
+import { URL } from 'url';
+import path from 'path';
+import TurndownService from 'turndown';
 
 // Verificar argumentos
 if (process.argv.length < 4) {
@@ -24,7 +24,7 @@ const turndownService = new TurndownService({
 });
 
 // Función para extraer el título del HTML
-function extractTitle(html) {
+function extractTitle(html: string): string | null {
   const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
   if (titleMatch && titleMatch[1]) {
     return titleMatch[1].trim();
@@ -33,9 +33,9 @@ function extractTitle(html) {
 }
 
 // Función para convertir título a nombre de archivo
-function titleToFilename(title) {
+function titleToFilename(title: string | null): string {
   if (!title) return 'untitled';
-  
+
   return title
     .toLowerCase()
     .normalize('NFD')
@@ -47,7 +47,7 @@ function titleToFilename(title) {
 }
 
 // Función para descargar una URL
-function fetchUrl(url) {
+function fetchUrl(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     try {
       const urlObj = new URL(url);
@@ -55,7 +55,7 @@ function fetchUrl(url) {
 
       client.get(url, (res) => {
         // Manejar redirects
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           fetchUrl(res.headers.location).then(resolve).catch(reject);
           return;
         }
@@ -66,7 +66,7 @@ function fetchUrl(url) {
         }
 
         let data = '';
-        res.on('data', (chunk) => {
+        res.on('data', (chunk: Buffer) => {
           data += chunk;
         });
         res.on('end', () => {
@@ -80,27 +80,31 @@ function fetchUrl(url) {
 }
 
 // Función para delay
-function delay(ms) {
+function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // Función para extraer el body o contenido principal del HTML
-function extractBody(html) {
+function extractBody(html: string): string {
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   return bodyMatch ? bodyMatch[1] : html;
 }
 
+interface JsonInput {
+  urls: string[];
+}
+
 // Función principal
-async function main() {
+async function main(): Promise<void> {
   // Leer el JSON de entrada
   const inputFullPath = path.isAbsolute(inputPath) ? inputPath : path.join(process.cwd(), inputPath);
   const outDirFullPath = path.isAbsolute(outDir) ? outDir : path.join(process.cwd(), outDir);
 
-  let jsonData;
+  let jsonData: JsonInput;
   try {
     jsonData = JSON.parse(fs.readFileSync(inputFullPath, 'utf8'));
   } catch (err) {
-    console.error(`Error al leer el archivo JSON: ${err.message}`);
+    console.error(`Error al leer el archivo JSON: ${(err as Error).message}`);
     process.exit(1);
   }
 
@@ -138,7 +142,7 @@ async function main() {
       console.log(`  ✓ Guardado: ${filename}.md`);
       successCount++;
     } catch (err) {
-      console.error(`  ✗ Error: ${err.message}`);
+      console.error(`  ✗ Error: ${(err as Error).message}`);
       errorCount++;
     }
 
@@ -152,5 +156,4 @@ async function main() {
 }
 
 main();
-
 

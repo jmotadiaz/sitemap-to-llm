@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const https = require('https');
-const http = require('http');
-const { URL } = require('url');
-const path = require('path');
+import fs from 'fs';
+import https from 'https';
+import http from 'http';
+import { URL } from 'url';
+import path from 'path';
 
 // Verificar que se haya proporcionado la ruta del sitemap
 if (process.argv.length < 3) {
@@ -16,11 +16,10 @@ const inputPath = process.argv[2];
 const outputPath = process.argv[3] || inputPath.replace(/\.xml$/, '.json');
 
 // Función para extraer URLs usando expresiones regulares
-function extractUrlsFromSitemap(xmlContent) {
-  const urls = [];
-  // Expresión regular para encontrar todas las etiquetas <loc>...</loc>
+function extractUrlsFromSitemap(xmlContent: string): string[] {
+  const urls: string[] = [];
   const urlRegex = /<loc>(.*?)<\/loc>/g;
-  let match;
+  let match: RegExpExecArray | null;
 
   while ((match = urlRegex.exec(xmlContent)) !== null) {
     urls.push(match[1]);
@@ -30,7 +29,7 @@ function extractUrlsFromSitemap(xmlContent) {
 }
 
 // Función para leer archivo local o descargar desde URL
-function getSitemapContent(pathOrUrl, callback) {
+function getSitemapContent(pathOrUrl: string, callback: (err: NodeJS.ErrnoException | null, data: string | null) => void): void {
   // Verificar si es una URL
   try {
     const urlObj = new URL(pathOrUrl);
@@ -38,7 +37,7 @@ function getSitemapContent(pathOrUrl, callback) {
 
     client.get(pathOrUrl, (res) => {
       let data = '';
-      res.on('data', (chunk) => {
+      res.on('data', (chunk: Buffer) => {
         data += chunk;
       });
       res.on('end', () => {
@@ -47,7 +46,7 @@ function getSitemapContent(pathOrUrl, callback) {
     }).on('error', (err) => {
       callback(err, null);
     });
-  } catch (err) {
+  } catch {
     // No es una URL, tratar como ruta de archivo local
     fs.readFile(path.join(process.cwd(), pathOrUrl), 'utf8', callback);
   }
@@ -61,7 +60,7 @@ getSitemapContent(inputPath, (err, xmlContent) => {
   }
 
   // Extraer URLs
-  const urls = extractUrlsFromSitemap(xmlContent);
+  const urls = extractUrlsFromSitemap(xmlContent!);
 
   // Crear objeto JSON con la estructura solicitada
   const jsonOutput = { urls };
@@ -77,3 +76,4 @@ getSitemapContent(inputPath, (err, xmlContent) => {
     console.log(`Se extrajeron ${urls.length} URLs`);
   });
 });
+
