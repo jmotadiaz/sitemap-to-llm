@@ -10,6 +10,7 @@ import dotenv from 'dotenv';
 // Cargar variables de entorno desde la raíz del proyecto
 const scriptDir = __dirname || path.dirname(process.argv[1]);
 const projectRoot = path.resolve(scriptDir, '..');
+const BATCH_SIZE = 20;
 dotenv.config({ path: path.join(projectRoot, '.env') });
 
 // Verificar argumentos
@@ -48,6 +49,10 @@ interface JinaExternalAssets {
   icon?: Record<string, JinaExternalResource | null | undefined> | null;
 }
 
+interface JinaUsage {
+  tokens?: number | null;
+}
+
 interface JinaMetadata {
   lang?: string | null;
   viewport?: string | null;
@@ -63,20 +68,20 @@ interface JinaDataPayload {
   content?: string | null;
   metadata?: JinaMetadata | null;
   external?: JinaExternalAssets | null;
+  usage?: JinaUsage | null;
 }
 
-interface JinaJsonPayload {
-  code?: number | null;
-  status?: number | null;
-  data?: JinaDataPayload | null;
+interface JinaMeta {
+  usage?: JinaUsage | null;
 }
 
 interface JinaResponse {
-  url?: string | null;
-  timestamp?: string | null;
-  jsonResponse?: JinaJsonPayload | null;
+  code?: number | null;
+  status?: number | null;
+  data?: JinaDataPayload | null;
   markdownResponse?: string | null;
   markdownLength?: number | null;
+  meta?: JinaMeta | null;
 }
 
 // Función para convertir título a nombre de archivo
@@ -199,39 +204,6 @@ function scrapeWithJinaJson(url: string): Promise<JinaResponse> {
   });
 }
 
-// Función para scrapear una URL usando Jina API (devuelve markdown)
-function scrapeWithJinaMarkdown(url: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: 'r.jina.ai',
-      path: `/${encodeURIComponent(url)}`,
-      headers: {
-        'X-Return-Format': 'markdown',
-        'Authorization': `Bearer ${apiKey}`
-      }
-    };
-
-    https.get(options, (res) => {
-      if (res.statusCode !== 200) {
-        reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
-        return;
-      }
-
-      let data = '';
-
-      res.on('data', (chunk: Buffer) => {
-        data += chunk;
-      });
-
-      res.on('end', () => {
-        resolve(data);
-      });
-    }).on('error', (e) => {
-      reject(new Error(`Error de conexión: ${e.message}`));
-    });
-  });
-}
-
 // Función para extraer el último segmento de la URL
 function getLastUrlSegment(url: string): string {
   try {
@@ -258,20 +230,11 @@ async function processUrl(url: string, index: number, total: number): Promise<Pr
     console.log(`[${index + 1}/${total}] Procesando: ${url}`);
 
     // Hacer ambas peticiones en paralelo: JSON para el título y markdown para el contenido
-    const [jsonData, markdown] = await Promise.all([
-      scrapeWithJinaJson(url).catch((err: Error) => {
-        console.error(`  ⚠ Error en petición JSON: ${err.message}`);
-        return {} as JinaResponse;
-      }),
-      scrapeWithJinaMarkdown(url).catch((err: Error) => {
-        console.error(`  ⚠ Error en petición Markdown: ${err.message}`);
-        return '';
-      })
-    ]);
+    const response = await scrapeWithJinaJson(url);
 
     // Extraer título del JSON
-    const jinaData = jsonData.jsonResponse?.data;
-    const title = jinaData?.title ?? jinaData?.metadata?.title ?? null;
+    const title = response?.data?.title ?? null;
+    const markdown = response?.markdownResponse ?? response?.data?.content ?? null;
 
     // Verificar que tenemos markdown
     if (!markdown || markdown.trim().length === 0) {
@@ -335,21 +298,21 @@ async function main(): Promise<void> {
     fs.mkdirSync(outDirFullPath, { recursive: true });
   }
 
-  console.log(`Procesando ${urls.length} URLs con Jina Reader (10 concurrentes por lote)...`);
+  console.log(`Procesando ${urls.length} URLs con Jina Reader (${BATCH_SIZE} concurrentes por lote)...`);
 
   let successCount = 0;
   let errorCount = 0;
 
-  // Dividir URLs en chunks de 10
-  const urlChunks = chunkArray(urls, 10);
+  // Dividir URLs en chunks configurables
+  const urlChunks = chunkArray(urls, BATCH_SIZE);
 
   for (let chunkIndex = 0; chunkIndex < urlChunks.length; chunkIndex++) {
     const chunk = urlChunks[chunkIndex];
-    const startIndex = chunkIndex * 10;
+    const startIndex = chunkIndex * BATCH_SIZE;
 
     console.log(`\n📦 Procesando lote ${chunkIndex + 1}/${urlChunks.length} (${chunk.length} URLs)...`);
 
-    // Procesar el chunk de 10 URLs concurrentemente
+    // Procesar el chunk de URLs concurrentemente
     const results = await Promise.all(
       chunk.map((url, i) => processUrl(url, startIndex + i, urls.length))
     );
