@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "main": "dist/index.js",
   "bin": {
-    "extract-from-json": "./dist/extractFromJson.js",
-    "sitemap-to-json": "./dist/sitemap2json.js",
-    "sitemap-to-txt": "./dist/sitemap2txt.js",
+    "extract-from-json": "./dist/extract-from-json.js",
+    "sitemap-to-json": "./dist/sitemap-to-json.js",
+    "sitemap-to-txt": "./dist/sitemap-to-txt.js",
     "sitemap-to-jina": "./dist/sitemap-to-jina.js",
     "web-to-md": "./dist/web-to-md.js"
   },
