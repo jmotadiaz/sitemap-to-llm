@@ -35,10 +35,48 @@ interface ProcessResult {
   error?: string;
 }
 
+interface JinaExternalResource {
+  as?: string | null;
+  crossorigin?: string | null;
+  type?: string | null;
+  fetchpriority?: string | null;
+  sizes?: string | null;
+}
+
+interface JinaExternalAssets {
+  preload?: Record<string, JinaExternalResource | null | undefined> | null;
+  icon?: Record<string, JinaExternalResource | null | undefined> | null;
+}
+
+interface JinaMetadata {
+  lang?: string | null;
+  viewport?: string | null;
+  'next-size-adjust'?: string | null;
+  description?: string | null;
+  [key: string]: string | null | undefined;
+}
+
+interface JinaDataPayload {
+  title?: string | null;
+  description?: string | null;
+  url?: string | null;
+  content?: string | null;
+  metadata?: JinaMetadata | null;
+  external?: JinaExternalAssets | null;
+}
+
+interface JinaJsonPayload {
+  code?: number | null;
+  status?: number | null;
+  data?: JinaDataPayload | null;
+}
+
 interface JinaResponse {
-  title?: string;
-  metadata?: { title?: string };
-  data?: { title?: string };
+  url?: string | null;
+  timestamp?: string | null;
+  jsonResponse?: JinaJsonPayload | null;
+  markdownResponse?: string | null;
+  markdownLength?: number | null;
 }
 
 // Función para convertir título a nombre de archivo
@@ -232,7 +270,8 @@ async function processUrl(url: string, index: number, total: number): Promise<Pr
     ]);
 
     // Extraer título del JSON
-    const title = jsonData.title || jsonData.metadata?.title || jsonData.data?.title || null;
+    const jinaData = jsonData.jsonResponse?.data;
+    const title = jinaData?.title ?? jinaData?.metadata?.title ?? null;
 
     // Verificar que tenemos markdown
     if (!markdown || markdown.trim().length === 0) {
