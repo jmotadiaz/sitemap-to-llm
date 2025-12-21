@@ -57,68 +57,6 @@ interface ProcessResult {
   error?: string;
 }
 
-interface JinaExternalResource {
-  as?: string | null;
-  crossorigin?: string | null;
-  type?: string | null;
-  fetchpriority?: string | null;
-  sizes?: string | null;
-}
-
-interface JinaExternalAssets {
-  preload?: Record<string, JinaExternalResource | null | undefined> | null;
-  icon?: Record<string, JinaExternalResource | null | undefined> | null;
-}
-
-interface JinaUsage {
-  tokens?: number | null;
-}
-
-interface JinaMetadata {
-  lang?: string | null;
-  viewport?: string | null;
-  'next-size-adjust'?: string | null;
-  description?: string | null;
-  [key: string]: string | null | undefined;
-}
-
-interface JinaDataPayload {
-  title?: string | null;
-  description?: string | null;
-  url?: string | null;
-  content?: string | null;
-  metadata?: JinaMetadata | null;
-  external?: JinaExternalAssets | null;
-  usage?: JinaUsage | null;
-}
-
-interface JinaMeta {
-  usage?: JinaUsage | null;
-}
-
-interface JinaResponse {
-  code?: number | null;
-  status?: number | null;
-  data?: JinaDataPayload | null;
-  markdownResponse?: string | null;
-  markdownLength?: number | null;
-  meta?: JinaMeta | null;
-}
-
-// Función para convertir título a nombre de archivo
-function titleToFilename(title: string | null): string {
-  if (!title) return 'untitled';
-
-  return title
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Eliminar acentos
-    .replace(/[^a-z0-9\s-]/g, '') // Solo letras, números, espacios y guiones
-    .trim()
-    .replace(/\s+/g, '-') // Espacios a guiones
-    .replace(/-+/g, '-'); // Múltiples guiones a uno solo
-}
-
 // Función para extraer URLs usando expresiones regulares
 function extractUrlsFromSitemap(xmlContent: string): string[] {
   const urls: string[] = [];
@@ -186,13 +124,12 @@ function extractUrlsFromJson(jsonContent: string): string[] {
   }
 }
 
-// Función para scrapear una URL usando Jina API (devuelve JSON con metadata)
-async function scrapeWithJinaJson(url: string): Promise<JinaResponse> {
+// Función para scrapear una URL usando Jina API (devuelve markdown directamente)
+async function scrapeWithJina(url: string): Promise<string> {
   const requestUrl = `https://r.jina.ai/${encodeURIComponent(url)}`;
   const headers = {
-    'X-Return-Format': 'json',
     'Authorization': `Bearer ${apiKey}`,
-    'Accept': 'application/json'
+    'Accept': 'text/plain'
   };
 
   let response: Response;
@@ -206,12 +143,7 @@ async function scrapeWithJinaJson(url: string): Promise<JinaResponse> {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
-  try {
-    const jsonData = await response.json() as JinaResponse;
-    return jsonData;
-  } catch (err) {
-    throw new Error(`Error al parsear JSON: ${(err as Error).message}`);
-  }
+  return await response.text();
 }
 
 // Función para extraer el último segmento de la URL
@@ -239,20 +171,15 @@ async function processUrl(url: string, index: number, total: number): Promise<Pr
   try {
     console.log(`[${index + 1}/${total}] Procesando: ${url}`);
 
-    // Hacer ambas peticiones en paralelo: JSON para el título y markdown para el contenido
-    const response = await scrapeWithJinaJson(url);
-
-    // Extraer título del JSON
-    const title = response?.data?.title ?? null;
-    const markdown = response?.markdownResponse ?? response?.data?.content ?? null;
+    const markdown = await scrapeWithJina(url);
 
     // Verificar que tenemos markdown
     if (!markdown || markdown.trim().length === 0) {
       throw new Error('No se obtuvo contenido markdown');
     }
 
-    // Usar título para el nombre del archivo, o último segmento de URL como fallback
-    const filename = title ? titleToFilename(title) : titleToFilename(getLastUrlSegment(url)) || `page-${index + 1}`;
+    // Usar siempre el último segmento de la URL como nombre de archivo
+    const filename = getLastUrlSegment(url) || `page-${index + 1}`;
 
     const outputFilePath = path.join(outDirFullPath, `${filename}.md`);
     fs.writeFileSync(outputFilePath, markdown, 'utf8');
