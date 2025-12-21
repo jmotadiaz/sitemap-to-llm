@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 
 import fs from 'fs';
-import https from 'https';
-import http from 'http';
-import { URL } from 'url';
 import path from 'path';
 import TurndownService from 'turndown';
 import minimist from 'minimist';
+import { processSitemap, fetchUrl } from './sitemap-utils.js';
 
 interface CliArgs {
   input?: string;
@@ -15,8 +13,9 @@ interface CliArgs {
 }
 
 function printUsage(exitCode = 1): never {
-  console.error('Uso: web-to-md -i <urls.json> -o <directorio-salida>');
-  console.error('  El JSON debe tener la estructura: { "urls": ["..."] }');
+  console.error('Uso: sitemap-to-md -i <sitemap.(xml|json|url)> -o <directorio-salida>');
+  console.error('  -i --input   Sitemap XML, JSON con {urls: string[]}, o URL');
+  console.error('  -o --output  Directorio donde guardar los .md generados');
   process.exit(exitCode);
 }
 
@@ -33,8 +32,6 @@ function parseArgs(): { inputPath: string; outDir: string } {
 
   return { inputPath: argv.input!, outDir: argv.output! };
 }
-
-const { inputPath, outDir } = parseArgs();
 
 // Configurar Turndown
 const turndownService = new TurndownService({
@@ -65,39 +62,6 @@ function titleToFilename(title: string | null): string {
     .replace(/-+/g, '-'); // Múltiples guiones a uno solo
 }
 
-// Función para descargar una URL
-function fetchUrl(url: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    try {
-      const urlObj = new URL(url);
-      const client = urlObj.protocol === 'https:' ? https : http;
-
-      client.get(url, (res) => {
-        // Manejar redirects
-        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          fetchUrl(res.headers.location).then(resolve).catch(reject);
-          return;
-        }
-
-        if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode}`));
-          return;
-        }
-
-        let data = '';
-        res.on('data', (chunk: Buffer) => {
-          data += chunk;
-        });
-        res.on('end', () => {
-          resolve(data);
-        });
-      }).on('error', reject);
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
 // Función para delay
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -109,30 +73,30 @@ function extractBody(html: string): string {
   return bodyMatch ? bodyMatch[1] : html;
 }
 
-interface JsonInput {
-  urls: string[];
-}
-
 // Función principal
 async function main(): Promise<void> {
-  // Leer el JSON de entrada
-  const inputFullPath = path.isAbsolute(inputPath) ? inputPath : path.join(process.cwd(), inputPath);
+  const { inputPath, outDir } = parseArgs();
   const outDirFullPath = path.isAbsolute(outDir) ? outDir : path.join(process.cwd(), outDir);
 
-  let jsonData: JsonInput;
+  console.log(`Procesando sitemap: ${inputPath}`);
+
+  let result;
   try {
-    jsonData = JSON.parse(fs.readFileSync(inputFullPath, 'utf8'));
+    result = await processSitemap(inputPath);
   } catch (err) {
-    console.error(`Error al leer el archivo JSON: ${(err as Error).message}`);
+    console.error(`Error al procesar el sitemap: ${(err as Error).message}`);
     process.exit(1);
   }
 
-  const { urls } = jsonData;
+  const { urls } = result;
 
-  if (!Array.isArray(urls) || urls.length === 0) {
-    console.error('El JSON debe contener un array "urls" con al menos una URL');
+  if (urls.length === 0) {
+    console.error('No se encontraron URLs en el sitemap');
     process.exit(1);
   }
+
+  console.log(`Fuente detectada: ${result.source}`);
+  console.log(`URLs encontradas: ${urls.length}`);
 
   // Crear directorio de salida si no existe
   if (!fs.existsSync(outDirFullPath)) {

@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 
 import fs from 'fs';
-import https from 'https';
-import http from 'http';
-import { URL } from 'url';
 import path from 'path';
 import dotenv from 'dotenv';
 import minimist from 'minimist';
+import { processSitemap } from './sitemap-utils.js';
 
 // Cargar variables de entorno desde la raíz del proyecto
 const scriptDir = __dirname || path.dirname(process.argv[1]);
@@ -21,8 +19,8 @@ interface CliArgs {
 }
 
 function printUsage(exitCode = 1): never {
-  console.error('Uso: sitemap-to-jina -i <sitemap.(xml|json)> -o <directorio-salida>');
-  console.error('  -i --input   Archivo local o URL con sitemap/JSON de URLs');
+  console.error('Uso: sitemap-to-jina -i <sitemap.(xml|json|url)> -o <directorio-salida>');
+  console.error('  -i --input   Sitemap XML, JSON con {urls: string[]}, o URL');
   console.error('  -o --output  Directorio donde guardar los .md generados');
   process.exit(exitCode);
 }
@@ -55,73 +53,6 @@ interface ProcessResult {
   url: string;
   filename?: string;
   error?: string;
-}
-
-// Función para extraer URLs usando expresiones regulares
-function extractUrlsFromSitemap(xmlContent: string): string[] {
-  const urls: string[] = [];
-  const urlRegex = /<loc>(.*?)<\/loc>/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = urlRegex.exec(xmlContent)) !== null) {
-    urls.push(match[1]);
-  }
-
-  return urls;
-}
-
-// Función para leer archivo local o descargar desde URL
-function getSitemapContent(pathOrUrl: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    try {
-      const urlObj = new URL(pathOrUrl);
-      const client = urlObj.protocol === 'https:' ? https : http;
-
-      client.get(pathOrUrl, (res) => {
-        // Manejar redirects
-        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          getSitemapContent(res.headers.location).then(resolve).catch(reject);
-          return;
-        }
-
-        if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode}`));
-          return;
-        }
-
-        let data = '';
-        res.on('data', (chunk: Buffer) => {
-          data += chunk;
-        });
-        res.on('end', () => {
-          resolve(data);
-        });
-      }).on('error', reject);
-    } catch {
-      // No es una URL, tratar como ruta de archivo local
-      const fullPath = path.isAbsolute(pathOrUrl) ? pathOrUrl : path.join(process.cwd(), pathOrUrl);
-      fs.readFile(fullPath, 'utf8', (err, data) => {
-        if (err) reject(err);
-        else resolve(data);
-      });
-    }
-  });
-}
-
-// Función para extraer URLs desde JSON
-function extractUrlsFromJson(jsonContent: string): string[] {
-  try {
-    const jsonData = JSON.parse(jsonContent);
-    const { urls } = jsonData;
-
-    if (!Array.isArray(urls) || urls.length === 0) {
-      return [];
-    }
-
-    return urls;
-  } catch {
-    return [];
-  }
 }
 
 // Función para scrapear una URL usando Jina API (devuelve markdown directamente)
@@ -203,32 +134,27 @@ function chunkArray<T>(array: T[], chunkSize: number): T[][] {
 
 // Función principal
 async function main(): Promise<void> {
-  // Leer el archivo de entrada (sitemap XML o JSON)
-  const inputFullPath = path.isAbsolute(inputPath) ? inputPath : path.join(process.cwd(), inputPath);
   outDirFullPath = path.isAbsolute(outDir) ? outDir : path.join(process.cwd(), outDir);
 
-  let content: string;
+  console.log(`Procesando sitemap: ${inputPath}`);
+
+  let result;
   try {
-    content = await getSitemapContent(inputFullPath);
+    result = await processSitemap(inputPath);
   } catch (err) {
-    console.error(`Error al leer el archivo: ${(err as Error).message}`);
+    console.error(`Error al procesar el sitemap: ${(err as Error).message}`);
     process.exit(1);
   }
 
-  // Determinar si es JSON o XML basándose en la extensión o contenido
-  const isJson = inputPath.toLowerCase().endsWith('.json') || content.trim().startsWith('{');
-  let urls: string[];
-
-  if (isJson) {
-    urls = extractUrlsFromJson(content);
-  } else {
-    urls = extractUrlsFromSitemap(content);
-  }
+  const { urls } = result;
 
   if (urls.length === 0) {
-    console.error('No se encontraron URLs en el archivo');
+    console.error('No se encontraron URLs en el sitemap');
     process.exit(1);
   }
+
+  console.log(`Fuente detectada: ${result.source}`);
+  console.log(`URLs encontradas: ${urls.length}`);
 
   // Crear directorio de salida si no existe
   if (!fs.existsSync(outDirFullPath)) {
@@ -271,4 +197,3 @@ main().catch((err: Error) => {
   console.error(`Error fatal: ${err.message}`);
   process.exit(1);
 });
-
