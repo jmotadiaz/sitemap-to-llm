@@ -5,15 +5,43 @@ import https from 'https';
 import http from 'http';
 import { URL } from 'url';
 import path from 'path';
+import minimist from 'minimist';
 
-// Verificar que se haya proporcionado la ruta del sitemap
-if (process.argv.length < 3) {
-  console.error('Uso: node sitemap-parser.js <ruta-al-sitemap.xml> [ruta-destino.json]');
-  process.exit(1);
+interface CliArgs {
+  input?: string;
+  output?: string;
+  help?: boolean;
 }
 
-const inputPath = process.argv[2];
-const outputPath = process.argv[3] || inputPath.replace(/\.xml$/, '.json');
+function printUsage(exitCode = 1): never {
+  console.error('Uso: sitemap-to-json -i <sitemap.xml> [-o <salida.json>]');
+  console.error('Alias: -i --input   Ruta del sitemap (archivo local o URL)');
+  console.error('       -o --output  Ruta de salida JSON (opcional)');
+  process.exit(exitCode);
+}
+
+function parseArgs(): { inputPath: string; outputPath: string } {
+  const argv = minimist<CliArgs>(process.argv.slice(2), {
+    alias: { i: 'input', o: 'output', h: 'help' },
+    string: ['input', 'output'],
+    boolean: ['help']
+  });
+
+  if (argv.help || !argv.input) {
+    printUsage(argv.help ? 0 : 1);
+  }
+
+  const inputPath = argv.input!;
+  const outputPath = argv.output || (
+    inputPath.toLowerCase().endsWith('.xml')
+      ? inputPath.replace(/\.xml$/i, '.json')
+      : `${inputPath}.json`
+  );
+
+  return { inputPath, outputPath };
+}
+
+const { inputPath, outputPath } = parseArgs();
 
 // Función para extraer URLs usando expresiones regulares
 function extractUrlsFromSitemap(xmlContent: string): string[] {

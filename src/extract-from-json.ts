@@ -2,6 +2,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import minimist from 'minimist';
 
 interface JsonInput {
   urls: string[];
@@ -9,22 +10,45 @@ interface JsonInput {
   excludeSelectors?: string[];
 }
 
-// Verificar que se haya proporcionado la ruta del sitemap
-if (process.argv.length < 3) {
-  console.error('Uso: node sitemap-parser.js <ruta-al-sitemap.xml> [ruta-destino.json]');
-  process.exit(1);
+interface CliArgs {
+  input?: string;
+  pattern?: string;
+  output?: string;
+  help?: boolean;
 }
 
-const inputPath = process.argv[2];
-const pattern = process.argv[3];
-const outputParam = process.argv[4];
+function printUsage(exitCode = 1): never {
+  console.error('Uso: extract-from-json -i <entrada.json> [-p <patron>] [-o <salida.json>]');
+  console.error('  -i --input     JSON con { urls, container?, excludeSelectors? }');
+  console.error('  -p --pattern   Texto para filtrar URLs (opcional)');
+  console.error('  -o --output    Nombre del archivo de salida (opcional)');
+  process.exit(exitCode);
+}
+
+function parseArgs(): { inputPath: string; pattern?: string; outputPath: string } {
+  const argv = minimist<CliArgs>(process.argv.slice(2), {
+    alias: { i: 'input', p: 'pattern', o: 'output', h: 'help' },
+    string: ['input', 'pattern', 'output'],
+    boolean: ['help']
+  });
+
+  if (argv.help || !argv.input) {
+    printUsage(argv.help ? 0 : 1);
+  }
+
+  const inputPath = argv.input!;
+  const pattern = argv.pattern;
+  const outputPath = argv.output || inputPath.replace(/\.json$/i, `-${pathToFileName(pattern)}.json`);
+
+  return { inputPath, pattern, outputPath };
+}
+
+const { inputPath, pattern, outputPath } = parseArgs();
 
 const { urls, container, excludeSelectors }: JsonInput = JSON.parse(
   fs.readFileSync(path.join(process.cwd(), inputPath), 'utf8')
 );
 const filteredUrls = pattern ? urls.filter(url => url.includes(pattern)) : urls;
-
-const outputPath = outputParam || inputPath.replace(/\.json$/, `-${pathToFileName(pattern)}.json`);
 
 fs.writeFile(
   path.join(process.cwd(), outputPath),

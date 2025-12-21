@@ -6,6 +6,7 @@ import http from 'http';
 import { URL } from 'url';
 import path from 'path';
 import dotenv from 'dotenv';
+import minimist from 'minimist';
 
 // Cargar variables de entorno desde la raíz del proyecto
 const scriptDir = __dirname || path.dirname(process.argv[1]);
@@ -13,14 +14,34 @@ const projectRoot = path.resolve(scriptDir, '..');
 const BATCH_SIZE = 50;
 dotenv.config({ path: path.join(projectRoot, '.env') });
 
-// Verificar argumentos
-if (process.argv.length < 4) {
-  console.error('Uso: sitemap-to-jina <ruta-al-sitemap.xml|ruta-al-archivo.json> <outDir>');
-  process.exit(1);
+interface CliArgs {
+  input?: string;
+  output?: string;
+  help?: boolean;
 }
 
-const inputPath = process.argv[2];
-const outDir = process.argv[3];
+function printUsage(exitCode = 1): never {
+  console.error('Uso: sitemap-to-jina -i <sitemap.(xml|json)> -o <directorio-salida>');
+  console.error('  -i --input   Archivo local o URL con sitemap/JSON de URLs');
+  console.error('  -o --output  Directorio donde guardar los .md generados');
+  process.exit(exitCode);
+}
+
+function parseArgs(): { inputPath: string; outDir: string } {
+  const argv = minimist<CliArgs>(process.argv.slice(2), {
+    alias: { i: 'input', o: 'output', h: 'help' },
+    string: ['input', 'output'],
+    boolean: ['help']
+  });
+
+  if (argv.help || !argv.input || !argv.output) {
+    printUsage(argv.help ? 0 : 1);
+  }
+
+  return { inputPath: argv.input!, outDir: argv.output! };
+}
+
+const { inputPath, outDir } = parseArgs();
 
 // Verificar que existe la API key
 const apiKey = process.env.JINA_API_KEY;

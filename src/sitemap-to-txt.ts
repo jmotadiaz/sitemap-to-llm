@@ -5,18 +5,44 @@ import https from 'https';
 import http from 'http';
 import { URL } from 'url';
 import path from 'path';
+import minimist from 'minimist';
 
-// Verificar que se haya proporcionado la ruta del sitemap
-if (process.argv.length < 3) {
-  console.error('Uso: sitemap-to-txt <ruta-al-sitemap.xml|.json> [ruta-destino.txt]');
+interface CliArgs {
+  input?: string;
+  output?: string;
+  help?: boolean;
+}
+
+function printUsage(exitCode = 1): never {
+  console.error('Uso: sitemap-to-txt -i <sitemap.(xml|json)> [-o <salida.txt>]');
   console.error('  Formatos soportados:');
   console.error('    - XML: sitemap estándar con etiquetas <loc>');
   console.error('    - JSON: { "urls": ["url1", "url2", ...] }');
-  process.exit(1);
+  process.exit(exitCode);
 }
 
-const inputPath = process.argv[2];
-const outputPath = process.argv[3] || inputPath.replace(/\.(xml|json)$/i, '.txt');
+function parseArgs(): { inputPath: string; outputPath: string } {
+  const argv = minimist<CliArgs>(process.argv.slice(2), {
+    alias: { i: 'input', o: 'output', h: 'help' },
+    string: ['input', 'output'],
+    boolean: ['help']
+  });
+
+  if (argv.help || !argv.input) {
+    printUsage(argv.help ? 0 : 1);
+  }
+
+  const inputPath = argv.input!;
+  const outputPath = argv.output || (
+    inputPath.match(/\.(xml|json)$/i)
+      ? inputPath.replace(/\.(xml|json)$/i, '.txt')
+      : `${inputPath}.txt`
+  );
+
+  return { inputPath, outputPath };
+}
+
+const { inputPath, outputPath } = parseArgs();
 
 // Detectar si el contenido es JSON
 function isJsonContent(content: string): boolean {

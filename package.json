@@ -20,10 +20,12 @@
   "dependencies": {
     "@mendable/firecrawl-js": "^1.21.1",
     "dotenv": "^17.2.3",
+    "minimist": "^1.2.8",
     "turndown": "^7.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/minimist": "^1.2.5",
     "@types/turndown": "^5.0.5",
     "typescript": "^5.7.0"
   }
