@@ -11,22 +11,32 @@ interface JsonInput {
   excludeSelectors?: string[];
 }
 
+type OutputFormat = 'json' | 'txt';
+
 interface CliArgs {
   input?: string;
-  pattern?: string;
+  pattern?: string | string[];
   output?: string;
   help?: boolean;
 }
 
 function printUsage(exitCode = 1): never {
-  console.error('Uso: extract-from-sitemap -i <entrada.(xml|json|url)> [-p <patron>] [-o <salida.json>]');
+  console.error('Uso: extract-from-sitemap -i <entrada.(xml|json|url)> [-p <patron>...] [-o <salida.txt|json>]');
   console.error('  -i --input     Sitemap XML, JSON con {urls: string[]}, o URL');
-  console.error('  -p --pattern   Texto para filtrar URLs (opcional)');
-  console.error('  -o --output    Nombre del archivo de salida (opcional)');
+  console.error('  -p --pattern   Texto para filtrar URLs (puede repetirse para múltiples patrones)');
+  console.error('  -o --output    Nombre del archivo de salida (default: sitemap.txt, extensión debe ser .txt o .json)');
   process.exit(exitCode);
 }
 
-function parseArgs(): { inputPath: string; pattern?: string; outputPath?: string } {
+function getFormatFromExtension(outputPath: string): OutputFormat {
+  const ext = path.extname(outputPath).toLowerCase();
+  if (ext === '.txt') return 'txt';
+  if (ext === '.json') return 'json';
+  console.error(`Error: Extensión no soportada "${ext}". Usa .txt o .json`);
+  process.exit(1);
+}
+
+function parseArgs(): { inputPath: string; patterns: string[]; outputPath: string; format: OutputFormat } {
   const argv = minimist<CliArgs>(process.argv.slice(2), {
     alias: { i: 'input', p: 'pattern', o: 'output', h: 'help' },
     string: ['input', 'pattern', 'output'],
@@ -37,26 +47,26 @@ function parseArgs(): { inputPath: string; pattern?: string; outputPath?: string
     printUsage(argv.help ? 0 : 1);
   }
 
+  // Normalizar patterns a array
+  let patterns: string[] = [];
+  if (argv.pattern) {
+    patterns = Array.isArray(argv.pattern) ? argv.pattern : [argv.pattern];
+  }
+
+  const outputPath = argv.output || 'sitemap.txt';
+  const format = getFormatFromExtension(outputPath);
+
   return {
     inputPath: argv.input!,
-    pattern: argv.pattern,
-    outputPath: argv.output
+    patterns,
+    outputPath,
+    format
   };
 }
 
-function pathToFileName(pattern: string | undefined): string {
-  if (!pattern) return 'filtered';
-  const filename = pattern.toLowerCase().replaceAll('/', '-');
-  return filename.endsWith('-') ? filename.slice(0, -1) : filename;
-}
-
-function generateOutputPath(inputPath: string, pattern?: string): string {
-  const baseName = path.basename(inputPath).replace(/\.(xml|json)$/i, '');
-  return `${baseName}-${pathToFileName(pattern)}.json`;
-}
 
 async function main(): Promise<void> {
-  const { inputPath, pattern, outputPath: customOutputPath } = parseArgs();
+  const { inputPath, patterns, outputPath, format } = parseArgs();
 
   console.log(`Procesando: ${inputPath}`);
 
@@ -71,15 +81,14 @@ async function main(): Promise<void> {
   console.log(`Fuente detectada: ${result.source}`);
   console.log(`URLs encontradas: ${result.urls.length}`);
 
-  const filteredUrls = pattern
-    ? result.urls.filter(url => url.includes(pattern))
+  const filteredUrls = patterns.length > 0
+    ? result.urls.filter(url => patterns.some(pattern => url.includes(pattern)))
     : result.urls;
 
-  if (pattern) {
-    console.log(`URLs filtradas (contienen "${pattern}"): ${filteredUrls.length}`);
+  if (patterns.length > 0) {
+    console.log(`URLs filtradas (contienen alguno de [${patterns.join(', ')}]): ${filteredUrls.length}`);
   }
 
-  const outputPath = customOutputPath || generateOutputPath(inputPath, pattern);
   const fullOutputPath = path.isAbsolute(outputPath)
     ? outputPath
     : path.join(process.cwd(), outputPath);
@@ -102,21 +111,28 @@ async function main(): Promise<void> {
     // Ignorar errores al leer propiedades adicionales
   }
 
-  const output: JsonInput = { urls: filteredUrls };
-  if (container) output.container = container;
-  if (excludeSelectors) output.excludeSelectors = excludeSelectors;
+  let outputContent: string;
+  if (format === 'json') {
+    const output: JsonInput = { urls: filteredUrls };
+    if (container) output.container = container;
+    if (excludeSelectors) output.excludeSelectors = excludeSelectors;
+    outputContent = JSON.stringify(output, null, 2);
+  } else {
+    // formato txt: una URL por línea
+    outputContent = filteredUrls.join('\n');
+  }
 
   fs.writeFile(
     fullOutputPath,
-    JSON.stringify(output, null, 2),
+    outputContent,
     'utf8',
     (err) => {
       if (err) {
-        console.error(`Error al escribir el archivo JSON: ${err.message}`);
+        console.error(`Error al escribir el archivo: ${err.message}`);
         process.exit(1);
       }
 
-      console.log(`Archivo JSON creado exitosamente: ${outputPath}`);
+      console.log(`Archivo ${format.toUpperCase()} creado exitosamente: ${outputPath}`);
     }
   );
 }
