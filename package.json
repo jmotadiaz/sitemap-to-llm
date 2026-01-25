@@ -7,7 +7,6 @@
     "composition-to-markdown": "./dist/composition-to-markdown.js",
     "sitemap-to-json": "./dist/sitemap-to-json.js",
     "sitemap-to-txt": "./dist/sitemap-to-txt.js",
-    "sitemap-to-jina": "./dist/sitemap-to-jina.js",
     "sitemap-to-md": "./dist/sitemap-to-md.js"
   },
   "scripts": {
