@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "dist/index.js",
   "bin": {
-    "extract-from-sitemap": "./dist/extract-from-sitemap.js",
+
     "composition-to-markdown": "./dist/composition-to-markdown.js",
     "sitemap-to-json": "./dist/sitemap-to-json.js",
     "sitemap-to-txt": "./dist/sitemap-to-txt.js",

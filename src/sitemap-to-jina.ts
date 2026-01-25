@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 import minimist from "minimist";
-import { processSitemap } from "./sitemap-utils.js";
+import { processSitemap, filterUrls } from "./sitemap-utils.js";
 
 // Cargar variables de entorno desde el directorio del script
 const scriptDir = __dirname || path.dirname(process.argv[1]);
@@ -18,6 +18,8 @@ interface CliArgs {
   "target-selector"?: string;
   "remove-selector"?: string;
   "numeric-prefix"?: boolean;
+  "include-pattern"?: string | string[];
+  "exclude-pattern"?: string | string[];
   help?: boolean;
 }
 
@@ -44,6 +46,12 @@ function printUsage(exitCode = 1): never {
   console.error(
     "  --numeric-prefix      Usar prefijo numérico en lugar de sufijo (ej: 001-titulo, 010-titulo)",
   );
+  console.error(
+    "  --include-pattern     Texto para filtrar URLs que incluyan el patrón (puede repetirse)",
+  );
+  console.error(
+    "  --exclude-pattern     Texto para excluir URLs que coincidan con el patrón (puede repetirse)",
+  );
   process.exit(exitCode);
 }
 
@@ -54,6 +62,8 @@ function parseArgs(): {
   targetSelector?: string;
   removeSelector?: string;
   numericPrefix: boolean;
+  includePatterns: string | string[];
+  excludePatterns: string | string[];
 } {
   const argv = minimist<CliArgs>(process.argv.slice(2), {
     alias: { i: "input", o: "output", t: "title-type", h: "help" },
@@ -63,6 +73,8 @@ function parseArgs(): {
       "title-type",
       "target-selector",
       "remove-selector",
+      "include-pattern",
+      "exclude-pattern",
     ],
     boolean: ["help", "numeric-prefix"],
   });
@@ -86,6 +98,8 @@ function parseArgs(): {
     targetSelector: argv["target-selector"],
     removeSelector: argv["remove-selector"],
     numericPrefix: argv["numeric-prefix"] || false,
+    includePatterns: argv["include-pattern"] || [],
+    excludePatterns: argv["exclude-pattern"] || [],
   };
 }
 
@@ -96,6 +110,8 @@ const {
   targetSelector,
   removeSelector,
   numericPrefix,
+  includePatterns,
+  excludePatterns,
 } = parseArgs();
 
 // Verificar que existe la API key
@@ -282,7 +298,24 @@ async function main(): Promise<void> {
   }
 
   console.log(`Fuente detectada: ${result.source}`);
-  console.log(`URLs encontradas: ${urls.length}`);
+  console.log(`Fuente detectada: ${result.source}`);
+
+  // Filtrar URLs
+  const {
+    filteredUrls,
+    urlsBeforeInclude,
+    urlsAfterInclude,
+    urlsAfterExclude,
+  } = filterUrls(urls, includePatterns, excludePatterns);
+
+  console.log(`URLs encontradas: ${urlsBeforeInclude}`);
+
+  const finalUrls = filteredUrls;
+
+  if (finalUrls.length === 0) {
+    console.error("No quedan URLs después de filtrar");
+    process.exit(1);
+  }
 
   // Crear directorio de salida si no existe
   if (!fs.existsSync(outDirFullPath)) {
@@ -290,14 +323,14 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Procesando ${urls.length} URLs con Jina Reader (${BATCH_SIZE} concurrentes por lote)...`,
+    `Procesando ${finalUrls.length} URLs con Jina Reader (${BATCH_SIZE} concurrentes por lote)...`,
   );
 
   let successCount = 0;
   let errorCount = 0;
 
   // Dividir URLs en chunks configurables
-  const urlChunks = chunkArray(urls, BATCH_SIZE);
+  const urlChunks = chunkArray(finalUrls, BATCH_SIZE);
 
   for (let chunkIndex = 0; chunkIndex < urlChunks.length; chunkIndex++) {
     const chunk = urlChunks[chunkIndex];
@@ -311,7 +344,7 @@ async function main(): Promise<void> {
 
     // Procesar el chunk de URLs concurrentemente
     const results = await Promise.all(
-      chunk.map((url, i) => processUrl(url, startIndex + i, urls.length)),
+      chunk.map((url, i) => processUrl(url, startIndex + i, finalUrls.length)),
     );
 
     // Contar éxitos y errores
