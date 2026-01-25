@@ -23,26 +23,26 @@ interface CliArgs {
 
 function printUsage(exitCode = 1): never {
   console.error(
-    "Uso: sitemap-to-jina -i <sitemap.(xml|json|url)> -o <directorio-salida> [opciones]"
+    "Uso: sitemap-to-jina -i <sitemap.(xml|json|url)> -o <directorio-salida> [opciones]",
   );
   console.error("\nOpciones:");
   console.error(
-    "  -i --input            Sitemap XML, JSON con {urls: string[]}, o URL"
+    "  -i --input            Sitemap XML, JSON con {urls: string[]}, o URL",
   );
   console.error(
-    "  -o --output           Directorio donde guardar los .md generados"
+    "  -o --output           Directorio donde guardar los .md generados",
   );
   console.error(
-    "  -t --title-type       Tipo de título: 'page' (título de la página) o 'url' (segmento URL) [default: page]"
+    "  -t --title-type       Tipo de título: 'page' (título de la página) o 'url' (segmento URL) [default: page]",
   );
   console.error(
-    "  --target-selector     Selectores CSS a incluir (ej: 'main, #content')"
+    "  --target-selector     Selectores CSS a incluir (ej: 'main, #content')",
   );
   console.error(
-    "  --remove-selector     Selectores CSS a excluir (ej: 'header, .ads, #footer')"
+    "  --remove-selector     Selectores CSS a excluir (ej: 'header, .ads, #footer')",
   );
   console.error(
-    "  --numeric-prefix      Usar prefijo numérico en lugar de sufijo (ej: 001-titulo, 010-titulo)"
+    "  --numeric-prefix      Usar prefijo numérico en lugar de sufijo (ej: 001-titulo, 010-titulo)",
   );
   process.exit(exitCode);
 }
@@ -74,7 +74,7 @@ function parseArgs(): {
   const titleType = argv["title-type"] || "page";
   if (titleType !== "page" && titleType !== "url") {
     console.error(
-      `Error: title-type debe ser 'page' o 'url', recibido: '${titleType}'`
+      `Error: title-type debe ser 'page' o 'url', recibido: '${titleType}'`,
     );
     process.exit(1);
   }
@@ -114,7 +114,7 @@ interface ProcessResult {
 
 // Función para scrapear una URL usando Jina API (formato por defecto con encabezado)
 async function scrapeWithJina(
-  url: string
+  url: string,
 ): Promise<{ content: string; title: string }> {
   const requestUrl = `https://r.jina.ai/${encodeURIComponent(url)}`;
   const headers: Record<string, string> = {
@@ -156,7 +156,7 @@ async function scrapeWithJina(
 
   // Eliminar el encabezado completo hasta "Markdown Content:"
   const markdownContentMatch = textResponse.match(
-    /Markdown Content:\s*\n([\s\S]*)/i
+    /Markdown Content:\s*\n([\s\S]*)/i,
   );
   const content = markdownContentMatch
     ? `# ${title}\n\n${markdownContentMatch[1].trim()}`
@@ -205,7 +205,7 @@ let outDirFullPath: string;
 async function processUrl(
   url: string,
   index: number,
-  total: number
+  total: number,
 ): Promise<ProcessResult> {
   try {
     console.log(`[${index + 1}/${total}] Procesando: ${url}`);
@@ -219,6 +219,7 @@ async function processUrl(
 
     // Elegir el nombre de archivo según el tipo de título configurado
     let baseFilename: string;
+    console.log(titleType);
     if (titleType === "page") {
       baseFilename = sanitizePageTitle(pageTitle);
       console.log(`  📄 Título: ${pageTitle}`);
@@ -289,7 +290,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Procesando ${urls.length} URLs con Jina Reader (${BATCH_SIZE} concurrentes por lote)...`
+    `Procesando ${urls.length} URLs con Jina Reader (${BATCH_SIZE} concurrentes por lote)...`,
   );
 
   let successCount = 0;
@@ -305,12 +306,12 @@ async function main(): Promise<void> {
     console.log(
       `\n📦 Procesando lote ${chunkIndex + 1}/${urlChunks.length} (${
         chunk.length
-      } URLs)...`
+      } URLs)...`,
     );
 
     // Procesar el chunk de URLs concurrentemente
     const results = await Promise.all(
-      chunk.map((url, i) => processUrl(url, startIndex + i, urls.length))
+      chunk.map((url, i) => processUrl(url, startIndex + i, urls.length)),
     );
 
     // Contar éxitos y errores
@@ -324,7 +325,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `\n✅ Completado: ${successCount} exitosos, ${errorCount} errores`
+    `\n✅ Completado: ${successCount} exitosos, ${errorCount} errores`,
   );
 }
 
