@@ -1,17 +1,9 @@
-#!/usr/bin/env node
-
 import fs from "fs";
 import path from "path";
-import dotenv from "dotenv";
-import minimist from "minimist";
 import TurndownService from "turndown";
 import { load } from "cheerio";
 
-// Cargar variables de entorno
-const scriptDir = __dirname || path.dirname(process.argv[1]);
-dotenv.config({ path: path.join(scriptDir, "../.env") });
-
-const BATCH_SIZE = 10; // Reducimos un poco la concurrencia para local processing
+const BATCH_SIZE = 10;
 
 interface Composition {
   targetSelectors?: string[];
@@ -21,46 +13,11 @@ interface Composition {
   children: string[];
 }
 
-interface CliArgs {
-  input?: string;
-  output?: string;
-  help?: boolean;
+export interface CompositionToMarkdownOptions {
+  inputPath: string;
+  outDir: string;
 }
 
-function printUsage(exitCode = 1): never {
-  console.error(
-    "Uso: composition-to-markdown -i <composition.json> -o <directorio-salida>"
-  );
-  console.error("\nOpciones:");
-  console.error(
-    "  -i --input            Archivo JSON de composición (default: composition.json)"
-  );
-  console.error(
-    "  -o --output           Directorio donde guardar los .md generados"
-  );
-  process.exit(exitCode);
-}
-
-function parseArgs(): { inputPath: string; outDir: string } {
-  const argv = minimist<CliArgs>(process.argv.slice(2), {
-    alias: { i: "input", o: "output", h: "help" },
-    string: ["input", "output"],
-    boolean: ["help"],
-  });
-
-  if (argv.help) {
-    printUsage(0);
-  }
-
-  return {
-    inputPath: argv.input || "composition.json",
-    outDir: argv.output || "output",
-  };
-}
-
-const { inputPath, outDir } = parseArgs();
-
-// Configurar Turndown
 const turndownService = new TurndownService({
   headingStyle: "atx",
   codeBlockStyle: "fenced",
@@ -69,7 +26,6 @@ const turndownService = new TurndownService({
 
 turndownService.remove("script");
 
-// Función para scrapear localmente
 async function scrapeWithFetch(
   url: string,
   targetSelectors: string[],
@@ -88,10 +44,8 @@ async function scrapeWithFetch(
     const html = await response.text();
     const $ = load(html);
 
-    // Obtener título
     const title = $("title").text().trim() || "untitled";
 
-    // Eliminar elementos no deseados
     if (removeSelectors.length > 0) {
       removeSelectors.forEach((selector) => {
         $(selector).remove();
@@ -100,9 +54,7 @@ async function scrapeWithFetch(
 
     let htmlToConvert = "";
 
-    // Seleccionar contenido objetivo
     if (targetSelectors.length > 0) {
-      // Creamos un contenedor virtual para juntar lo que encontremos
       const container = $("<div></div>");
       let foundAny = false;
 
@@ -119,24 +71,17 @@ async function scrapeWithFetch(
       if (foundAny) {
         htmlToConvert = container.html() || "";
       } else {
-        // Si no encuentra nada con los selectores, fallback al body o html completo?
-        // Generalmente si especificas target y no está, es mejor devolver vacío o aviso.
-        // Pero para robustez, si está vacío intentaremos devolver ""
         htmlToConvert = "";
         console.warn(
           `    ⚠️ Warning: No content found for target selectors in ${url}`
         );
       }
     } else {
-      // Sin target selectors, tomamos el body
       htmlToConvert = $("body").html() || "";
     }
 
-    // Convertir a MD
     let markdown = turndownService.turndown(htmlToConvert);
 
-    // Asegurar título al principio si no está ya (opcional, pero Jina lo hacía)
-    // Vamos a replicar el formato: Titulo h1 arriba
     if (title && title !== "untitled") {
       markdown = `# ${title}\n\n${markdown}`;
     }
@@ -168,7 +113,9 @@ function getLastUrlSegment(url: string): string {
   }
 }
 
-async function processComposition() {
+export async function compositionToMarkdown(options: CompositionToMarkdownOptions): Promise<void> {
+  const { inputPath, outDir } = options;
+
   const fullInputPath = path.isAbsolute(inputPath)
     ? inputPath
     : path.join(process.cwd(), inputPath);
@@ -187,7 +134,6 @@ async function processComposition() {
     process.exit(1);
   }
 
-  // Resolver selectores
   const targets =
     composition.targetSelectors || composition.targerSelectors || [];
   const removes = composition.removeSelectors || [];
@@ -198,12 +144,10 @@ async function processComposition() {
   console.log(`Target Selectors: ${targets.join(", ")}`);
   console.log(`Remove Selectors: ${removes.join(", ")}`);
 
-  // Crear directorio de salida
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
   }
 
-  // Procesar cada parent
   for (const [index, parentUrl] of composition.parents.entries()) {
     console.log(
       `\n[${index + 1}/${
@@ -211,7 +155,6 @@ async function processComposition() {
       }] Procesando Parent: ${parentUrl}`
     );
 
-    // Identificar children de este parent
     const parentChildren = composition.children.filter(
       (childUrl) => childUrl.startsWith(parentUrl) && childUrl !== parentUrl
     );
@@ -223,7 +166,6 @@ async function processComposition() {
 
     const results: string[] = [];
 
-    // Chunking logic
     for (let i = 0; i < urlsToFetch.length; i += BATCH_SIZE) {
       const chunk = urlsToFetch.slice(i, i + BATCH_SIZE);
       console.log(
@@ -242,7 +184,6 @@ async function processComposition() {
       }
     }
 
-    // Unir todo el contenido
     const finalContent = results.join("\n\n---\n\n");
 
     const filename = `${getLastUrlSegment(parentUrl)}.md`;
@@ -254,8 +195,3 @@ async function processComposition() {
 
   console.log("\nProceso completado.");
 }
-
-processComposition().catch((err) => {
-  console.error("Error fatal:", err);
-  process.exit(1);
-});

@@ -1,127 +1,18 @@
-#!/usr/bin/env node
-
 import fs from "fs";
 import path from "path";
 import TurndownService from "turndown";
-import minimist from "minimist";
-import dotenv from "dotenv";
 import { processSitemap, fetchUrl, filterUrls } from "./sitemap-utils.js";
 
-// Load environment variables
-const scriptDir = __dirname || path.dirname(process.argv[1]);
-dotenv.config({ path: path.join(scriptDir, ".env") });
-
-interface CliArgs {
-  input?: string;
-  output?: string;
-  engine?: "fetch" | "jina";
-  "title-type"?: "page" | "url";
-  "target-selector"?: string;
-  "remove-selector"?: string;
-  "jina-api-key"?: string;
-  "include-pattern"?: string | string[];
-  "exclude-pattern"?: string | string[];
-  help?: boolean;
-}
-
-function printUsage(exitCode = 1): never {
-  console.error(
-    "Uso: sitemap-to-md -i <sitemap.(xml|json|url)> -o <directorio-salida> [opciones]",
-  );
-  console.error("\nOpciones Generales:");
-  console.error(
-    "  -i --input            Sitemap XML, JSON con {urls: string[]}, o URL",
-  );
-  console.error(
-    "  -o --output           Directorio donde guardar los .md generados",
-  );
-  console.error(
-    "  --engine              Motor de extracción: 'fetch' (default) o 'jina'",
-  );
-  console.error(
-    "  --title-type          Tipo de título: 'page' (título de la página) o 'url' (segmento URL) [default: page]",
-  );
-  console.error(
-    "                        Nota: Si es 'url', se añade automáticamente un prefijo numérico.",
-  );
-  console.error(
-    "  --include-pattern     Texto para filtrar URLs que incluyan el patrón (puede repetirse)",
-  );
-  console.error(
-    "  --exclude-pattern     Texto para excluir URLs que coincidan con el patrón (puede repetirse)",
-  );
-
-  console.error("\nOpciones Jina Engine:");
-  console.error(
-    "  --target-selector     Selectores CSS a incluir (ej: 'main, #content')",
-  );
-  console.error(
-    "  --remove-selector     Selectores CSS a excluir (ej: 'header, .ads, #footer')",
-  );
-  console.error(
-    "  --jina-api-key        API Key de Jina (opcional si existe JINA_API_KEY en .env)",
-  );
-  process.exit(exitCode);
-}
-
-function parseArgs(): {
+export interface SitemapToMdOptions {
   inputPath: string;
   outDir: string;
-  engine: "fetch" | "jina";
-  titleType: "page" | "url";
+  engine?: "fetch" | "jina";
+  titleType?: "page" | "url";
   targetSelector?: string;
   removeSelector?: string;
   jinaApiKey?: string;
-  includePatterns: string | string[];
-  excludePatterns: string | string[];
-} {
-  const argv = minimist<CliArgs>(process.argv.slice(2), {
-    alias: { i: "input", o: "output", h: "help" },
-    string: [
-      "input",
-      "output",
-      "engine",
-      "title-type",
-      "target-selector",
-      "remove-selector",
-      "jina-api-key",
-      "include-pattern",
-      "exclude-pattern",
-    ],
-    boolean: ["help"],
-  });
-
-  if (argv.help || !argv.input || !argv.output) {
-    printUsage(argv.help ? 0 : 1);
-  }
-
-  const engine = argv.engine || "fetch";
-  if (engine !== "fetch" && engine !== "jina") {
-    console.error(
-      `Error: engine debe ser 'fetch' o 'jina', recibido: '${engine}'`,
-    );
-    process.exit(1);
-  }
-
-  const titleType = argv["title-type"] || "page";
-  if (titleType !== "page" && titleType !== "url") {
-    console.error(
-      `Error: title-type debe ser 'page' o 'url', recibido: '${titleType}'`,
-    );
-    process.exit(1);
-  }
-
-  return {
-    inputPath: argv.input!,
-    outDir: argv.output!,
-    engine,
-    titleType,
-    targetSelector: argv["target-selector"],
-    removeSelector: argv["remove-selector"],
-    jinaApiKey: argv["jina-api-key"],
-    includePatterns: argv["include-pattern"] || [],
-    excludePatterns: argv["exclude-pattern"] || [],
-  };
+  includePatterns?: string | string[];
+  excludePatterns?: string | string[];
 }
 
 // Configurar Turndown (para engine: fetch)
@@ -130,13 +21,10 @@ const turndownService = new TurndownService({
   codeBlockStyle: "fenced",
 });
 
-// --- HELPER FUNCTIONS ---
-
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Extraer título del HTML (para engine: fetch)
 function extractTitleFromHtml(html: string): string | null {
   const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
   if (titleMatch && titleMatch[1]) {
@@ -145,13 +33,11 @@ function extractTitleFromHtml(html: string): string | null {
   return null;
 }
 
-// Extraer body del HTML (para engine: fetch)
 function extractBodyFromHtml(html: string): string {
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   return bodyMatch ? bodyMatch[1] : html;
 }
 
-// Obtener último segmento de URL
 function getLastUrlSegment(url: string): string {
   try {
     const urlObj = new URL(url);
@@ -161,7 +47,6 @@ function getLastUrlSegment(url: string): string {
       .filter((segment) => segment.length > 0);
     if (segments.length > 0) {
       let lastSegment = segments[segments.length - 1];
-      // Remover extensión si existe
       lastSegment = lastSegment.replace(/\.[^/.]+$/, "");
       return lastSegment || "index";
     }
@@ -171,22 +56,20 @@ function getLastUrlSegment(url: string): string {
   }
 }
 
-// Sanitizar título de página para nombre de archivo
 function sanitizeFilename(name: string): string {
   return (
     name
       .toLowerCase()
       .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // Eliminar acentos
-      .replace(/[^a-z0-9\s-]/g, "-") // Reemplazar caracteres especiales con guiones
-      .replace(/\s+/g, "-") // Espacios a guiones
-      .replace(/-+/g, "-") // Múltiples guiones a uno solo
-      .replace(/^-+|-+$/g, "") // Eliminar guiones al inicio y final
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s-]/g, "-")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "")
       .slice(0, 100) || "untitled"
   );
 }
 
-// Determinar nombre de archivo final
 function determineFilename(
   url: string,
   pageTitle: string | null,
@@ -198,7 +81,6 @@ function determineFilename(
 
   if (titleType === "page") {
     baseFilename = sanitizeFilename(pageTitle || "untitled");
-    // Fallback si el título es inválido/vacío
     if (baseFilename === "untitled") {
       baseFilename = getLastUrlSegment(url);
     }
@@ -206,7 +88,6 @@ function determineFilename(
     baseFilename = getLastUrlSegment(url);
   }
 
-  // Si titleType es 'url', aplicamos prefijo numérico automáticamente
   if (titleType === "url") {
     const paddingWidth = total.toString().length;
     const paddedIndex = (index + 1).toString().padStart(paddingWidth, "0");
@@ -215,8 +96,6 @@ function determineFilename(
 
   return baseFilename;
 }
-
-// --- JINA ENGINE LOGIC ---
 
 async function scrapeWithJina(
   url: string,
@@ -242,7 +121,6 @@ async function scrapeWithJina(
 
   const textResponse = await response.text();
 
-  // Parsear respuesta de Jina
   const titleMatch = textResponse.match(/^Title:\s*(.+)$/m);
   const title = titleMatch ? titleMatch[1].trim() : "untitled";
 
@@ -256,27 +134,23 @@ async function scrapeWithJina(
   return { content, title };
 }
 
-// --- MAIN ---
-
-async function main(): Promise<void> {
-  const args = parseArgs();
+export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
   const {
     inputPath,
     outDir,
-    engine,
-    titleType,
+    engine = "fetch",
+    titleType = "page",
     targetSelector,
     removeSelector,
     jinaApiKey,
-    includePatterns,
-    excludePatterns,
-  } = args;
+    includePatterns = [],
+    excludePatterns = [],
+  } = options;
 
   const outDirFullPath = path.isAbsolute(outDir)
     ? outDir
     : path.join(process.cwd(), outDir);
 
-  // Validar API Key si se usa Jina
   let finalJinaKey = "";
   if (engine === "jina") {
     finalJinaKey = jinaApiKey || process.env.JINA_API_KEY || "";
@@ -290,7 +164,6 @@ async function main(): Promise<void> {
 
   console.log(`Procesando sitemap: ${inputPath} [Engine: ${engine}]`);
 
-  // Procesar Sitemap
   let result;
   try {
     result = await processSitemap(inputPath);
@@ -307,7 +180,6 @@ async function main(): Promise<void> {
 
   console.log(`Fuente detectada: ${result.source}`);
 
-  // Filtrar URLs
   const { filteredUrls } = filterUrls(urls, includePatterns, excludePatterns);
   const finalUrls = filteredUrls;
 
@@ -316,7 +188,6 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Crear directorio
   if (!fs.existsSync(outDirFullPath)) {
     fs.mkdirSync(outDirFullPath, { recursive: true });
   }
@@ -326,9 +197,7 @@ async function main(): Promise<void> {
   let successCount = 0;
   let errorCount = 0;
 
-  // Lógica de procesamiento según engine
   if (engine === "jina") {
-    // Jina: Procesamiento concurrente en lotes
     const BATCH_SIZE = 50;
     const chunkArray = <T>(arr: T[], size: number): T[][] => {
       const chunks: T[][] = [];
@@ -386,7 +255,6 @@ async function main(): Promise<void> {
       });
     }
   } else {
-    // Fetch: Procesamiento secuencial (con delay)
     for (let i = 0; i < finalUrls.length; i++) {
       const url = finalUrls[i];
       console.log(`[${i + 1}/${finalUrls.length}] Descargando: ${url}`);
@@ -397,7 +265,6 @@ async function main(): Promise<void> {
         const body = extractBodyFromHtml(html);
         let markdown = turndownService.turndown(body);
 
-        // Add title to markdown content if not present
         if (title) {
           markdown = `# ${title}\n\n${markdown}`;
         }
@@ -429,8 +296,3 @@ async function main(): Promise<void> {
     `\n✅ Completado: ${successCount} exitosos, ${errorCount} errores`,
   );
 }
-
-main().catch((err) => {
-  console.error(`Error fatal: ${err.message}`);
-  process.exit(1);
-});
