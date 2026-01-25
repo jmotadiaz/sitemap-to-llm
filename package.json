@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "dist/index.js",
   "bin": {
-    "extract-from-sitemap": "./dist/extract-from-sitemap.js",
+    "extract-from-sitemap": "./dist/scripts/extract-from-sitemap.js",
     "composition-to-markdown": "./dist/composition-to-markdown.js",
     "sitemap-to-json": "./dist/sitemap-to-json.js",
     "sitemap-to-txt": "./dist/sitemap-to-txt.js",
@@ -11,7 +11,8 @@
     "sitemap-to-md": "./dist/sitemap-to-md.js"
   },
   "scripts": {
-    "build": "tsc && cp .env dist/.env",
+    "build": "tsc && (cp .env dist/.env || true)",
+    "serve": "node dist/web/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -22,10 +23,12 @@
     "@mendable/firecrawl-js": "^1.21.1",
     "cheerio": "^1.1.2",
     "dotenv": "^17.2.3",
+    "express": "^5.2.1",
     "minimist": "^1.2.8",
     "turndown": "^7.2.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/minimist": "^1.2.5",
     "@types/node": "^22.0.0",
     "@types/turndown": "^5.0.5",
