@@ -9,3 +9,19 @@
     @apply font-display font-bold;
   }
 }
+
+.spinner {
+  @apply hidden w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin;
+}
+
+button[disabled] .spinner {
+  @apply block;
+}
+
+button[disabled] span, button[disabled] svg:not(.spinner) {
+  @apply hidden;
+}
+
+button[disabled] {
+  @apply opacity-70 cursor-not-allowed transform-none;
+}

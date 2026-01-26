@@ -75,11 +75,14 @@
 
         <div class="pt-4">
             <button type="submit" class="w-full bg-white text-black hover:bg-slate-200 font-bold py-4 rounded-xl shadow-lg transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2">
+                <div class="spinner !border-black/30 !border-t-black"></div>
                 <span>Start Scraping & Download ZIP</span>
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
             </button>
         </div>
     </form>
 </div>
+
+<script src="/js/form-handler.js"></script>
 
 <%~ include('./partials/footer', it) %>

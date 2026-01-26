@@ -45,11 +45,14 @@
 
         <div class="pt-4">
             <button type="submit" class="w-full bg-gradient-to-r from-accent-600 to-brand-500 hover:from-accent-500 hover:to-brand-400 text-white font-bold py-4 rounded-xl shadow-lg shadow-accent-500/25 transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2">
+                <div class="spinner"></div>
                 <span>Generate Text File</span>
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
             </button>
         </div>
     </form>
 </div>
+
+<script src="/js/form-handler.js"></script>
 
 <%~ include('./partials/footer', it) %>
