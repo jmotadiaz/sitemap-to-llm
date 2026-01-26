@@ -1,0 +1,12 @@
+    </main>
+
+    <footer class="border-t border-white/5 py-12 bg-space-950">
+        <div class="container mx-auto px-6 text-center">
+            <p class="text-slate-500 text-sm">
+                Built with <span class="text-brand-500">♥</span> by Antigravity
+            </p>
+        </div>
+    </footer>
+
+</body>
+</html>

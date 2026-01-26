@@ -1,0 +1,11 @@
+@config "../../tailwind.config.js";
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-space-950 text-white font-sans antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-bold;
+  }
+}

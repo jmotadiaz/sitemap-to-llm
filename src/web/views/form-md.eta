@@ -1,0 +1,85 @@
+<%~ include('./partials/header', it) %>
+
+<div class="max-w-2xl mx-auto space-y-8 animate-fade-in">
+    <div class="space-y-2">
+        <a href="/" class="text-slate-500 hover:text-white transition-colors text-sm flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+            Back to Dashboard
+        </a>
+        <h1 class="text-4xl font-bold text-white">Sitemap to Markdown</h1>
+        <p class="text-slate-400 font-light">Crawl pages and convert content to Markdown for LLM context.</p>
+    </div>
+
+    <form action="/md" method="POST" class="space-y-8 relative">
+        <div class="absolute inset-0 -m-8 bg-space-900/50 rounded-3xl border border-white/5 -z-10"></div>
+
+        <!-- Input URL -->
+        <div class="space-y-3">
+            <label for="input" class="block text-sm font-medium text-slate-300">Sitemap URL <span class="text-red-400">*</span></label>
+            <div class="relative group">
+                <input type="url" name="input" id="input" required placeholder="https://example.com/sitemap.xml"
+                    class="w-full bg-space-950 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all group-hover:border-white/20">
+            </div>
+        </div>
+
+        <!-- Engine & Options -->
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="space-y-3">
+                <label for="engine" class="block text-sm font-medium text-slate-300">Extraction Engine</label>
+                <select name="engine" id="engine" class="w-full bg-space-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all appearance-none">
+                    <option value="fetch">Fetch (Default)</option>
+                    <option value="jina">Jina Reader</option>
+                </select>
+            </div>
+
+            <div class="space-y-3">
+                <label for="title_type" class="block text-sm font-medium text-slate-300">Filename Strategy</label>
+                <select name="title_type" id="title_type" class="w-full bg-space-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all appearance-none">
+                    <option value="page">Page Title (e.g., About Us.md)</option>
+                    <option value="url">URL Segment (e.g., 01-about-us.md)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Filtering -->
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="space-y-3">
+                <label for="include_patterns" class="block text-sm font-medium text-slate-300">Include Patterns</label>
+                <input type="text" name="include_patterns" id="include_patterns" placeholder="/blog"
+                    class="w-full bg-space-950 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all">
+            </div>
+
+            <div class="space-y-3">
+                <label for="exclude_patterns" class="block text-sm font-medium text-slate-300">Exclude Patterns</label>
+                <input type="text" name="exclude_patterns" id="exclude_patterns" placeholder="/admin"
+                    class="w-full bg-space-950 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all">
+            </div>
+        </div>
+
+        <!-- Advanced Content Selectors -->
+        <div class="space-y-4 pt-4 border-t border-white/5">
+            <h3 class="text-sm font-medium text-slate-400 uppercase tracking-widest">Advanced Selectors</h3>
+            <div class="grid md:grid-cols-2 gap-6">
+                 <div class="space-y-3">
+                    <label for="target_selector" class="block text-sm font-medium text-slate-300">Target Selector (CSS)</label>
+                    <input type="text" name="target_selector" id="target_selector" placeholder="main, #content"
+                        class="w-full bg-space-950 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all">
+                </div>
+                <div class="space-y-3">
+                    <label for="remove_selector" class="block text-sm font-medium text-slate-300">Remove Selector (CSS)</label>
+                    <input type="text" name="remove_selector" id="remove_selector" placeholder=".ads, nav, footer"
+                        class="w-full bg-space-950 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all">
+                </div>
+            </div>
+        </div>
+
+        <div class="pt-4">
+            <button type="submit" class="w-full bg-white text-black hover:bg-slate-200 font-bold py-4 rounded-xl shadow-lg transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2">
+                <span>Start Scraping & Download ZIP</span>
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+            </button>
+        </div>
+    </form>
+</div>
+
+<%~ include('./partials/footer', it) %>
