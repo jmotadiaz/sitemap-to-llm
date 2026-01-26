@@ -158,7 +158,9 @@ export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
       console.error(
         "Error: JINA_API_KEY es requerida para el motor Jina. Úsala en .env o como argumento.",
       );
-      process.exit(1);
+      throw new Error(
+        "Error: JINA_API_KEY es requerida para el motor Jina. Úsala en .env o como argumento.",
+      );
     }
   }
 
@@ -169,13 +171,13 @@ export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
     result = await processSitemap(inputPath);
   } catch (err) {
     console.error(`Error al procesar el sitemap: ${(err as Error).message}`);
-    process.exit(1);
+    throw new Error(`Error al procesar el sitemap: ${(err as Error).message}`);
   }
 
   const { urls } = result;
   if (urls.length === 0) {
     console.error("No se encontraron URLs en el sitemap");
-    process.exit(1);
+    throw new Error("No se encontraron URLs en el sitemap");
   }
 
   console.log(`Fuente detectada: ${result.source}`);
@@ -185,7 +187,7 @@ export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
 
   if (finalUrls.length === 0) {
     console.error("No quedan URLs después de filtrar");
-    process.exit(1);
+    throw new Error("No quedan URLs después de filtrar");
   }
 
   if (!fs.existsSync(outDirFullPath)) {

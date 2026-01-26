@@ -29,7 +29,9 @@ function generateOutputPath(inputPath: string): string {
     : `${inputPath}.txt`;
 }
 
-export async function sitemapToTxt(options: SitemapToTxtOptions): Promise<void> {
+export async function sitemapToTxt(
+  options: SitemapToTxtOptions,
+): Promise<void> {
   const {
     inputPath,
     outputPath: customOutputPath,
@@ -44,7 +46,7 @@ export async function sitemapToTxt(options: SitemapToTxtOptions): Promise<void> 
     result = await processSitemap(inputPath);
   } catch (err) {
     console.error(`Error al procesar el sitemap: ${(err as Error).message}`);
-    process.exit(1);
+    throw new Error(`Error al procesar el sitemap: ${(err as Error).message}`);
   }
 
   console.log(`Fuente detectada: ${result.source}`);
@@ -52,10 +54,11 @@ export async function sitemapToTxt(options: SitemapToTxtOptions): Promise<void> 
   const { urls } = result;
 
   // Filtrar URLs
-  const {
-    filteredUrls,
-    urlsBeforeInclude,
-  } = filterUrls(urls, includePatterns, excludePatterns);
+  const { filteredUrls, urlsBeforeInclude } = filterUrls(
+    urls,
+    includePatterns,
+    excludePatterns,
+  );
 
   if (filteredUrls.length === 0) {
     console.error(
@@ -64,7 +67,9 @@ export async function sitemapToTxt(options: SitemapToTxtOptions): Promise<void> 
     console.error("Formatos soportados:");
     console.error("  - XML: sitemap con etiquetas <loc>");
     console.error('  - JSON: { "urls": ["url1", "url2", ...] }');
-    process.exit(1);
+    throw new Error(
+      "No se encontraron URLs en el sitemap (o todas fueron filtradas)",
+    );
   }
 
   // Crear contenido TXT con cada URL en una línea
@@ -82,7 +87,11 @@ export async function sitemapToTxt(options: SitemapToTxtOptions): Promise<void> 
       `Se extrajeron ${filteredUrls.length} URLs (de ${urlsBeforeInclude} originales)`,
     );
   } catch (err) {
-    console.error(`Error al escribir el archivo TXT: ${(err as Error).message}`);
-    process.exit(1);
+    console.error(
+      `Error al escribir el archivo TXT: ${(err as Error).message}`,
+    );
+    throw new Error(
+      `Error al escribir el archivo TXT: ${(err as Error).message}`,
+    );
   }
 }

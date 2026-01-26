@@ -29,7 +29,7 @@ turndownService.remove("script");
 async function scrapeWithFetch(
   url: string,
   targetSelectors: string[],
-  removeSelectors: string[]
+  removeSelectors: string[],
 ): Promise<{ content: string; title: string }> {
   try {
     const response = await fetch(url);
@@ -73,7 +73,7 @@ async function scrapeWithFetch(
       } else {
         htmlToConvert = "";
         console.warn(
-          `    ⚠️ Warning: No content found for target selectors in ${url}`
+          `    ⚠️ Warning: No content found for target selectors in ${url}`,
         );
       }
     } else {
@@ -113,7 +113,9 @@ function getLastUrlSegment(url: string): string {
   }
 }
 
-export async function compositionToMarkdown(options: CompositionToMarkdownOptions): Promise<void> {
+export async function compositionToMarkdown(
+  options: CompositionToMarkdownOptions,
+): Promise<void> {
   const { inputPath, outDir } = options;
 
   const fullInputPath = path.isAbsolute(inputPath)
@@ -122,7 +124,7 @@ export async function compositionToMarkdown(options: CompositionToMarkdownOption
 
   if (!fs.existsSync(fullInputPath)) {
     console.error(`Error: No se encontró el archivo ${fullInputPath}`);
-    process.exit(1);
+    throw new Error(`Error: No se encontró el archivo ${fullInputPath}`);
   }
 
   const compositionContent = fs.readFileSync(fullInputPath, "utf-8");
@@ -131,7 +133,7 @@ export async function compositionToMarkdown(options: CompositionToMarkdownOption
     composition = JSON.parse(compositionContent);
   } catch (e) {
     console.error("Error al parsear el JSON de entrada");
-    process.exit(1);
+    throw new Error("Error al parsear el JSON de entrada");
   }
 
   const targets =
@@ -152,16 +154,16 @@ export async function compositionToMarkdown(options: CompositionToMarkdownOption
     console.log(
       `\n[${index + 1}/${
         composition.parents.length
-      }] Procesando Parent: ${parentUrl}`
+      }] Procesando Parent: ${parentUrl}`,
     );
 
     const parentChildren = composition.children.filter(
-      (childUrl) => childUrl.startsWith(parentUrl) && childUrl !== parentUrl
+      (childUrl) => childUrl.startsWith(parentUrl) && childUrl !== parentUrl,
     );
 
     const urlsToFetch = [parentUrl, ...parentChildren];
     console.log(
-      `  Encontrados ${parentChildren.length} children. Total a fetchear: ${urlsToFetch.length}`
+      `  Encontrados ${parentChildren.length} children. Total a fetchear: ${urlsToFetch.length}`,
     );
 
     const results: string[] = [];
@@ -170,12 +172,12 @@ export async function compositionToMarkdown(options: CompositionToMarkdownOption
       const chunk = urlsToFetch.slice(i, i + BATCH_SIZE);
       console.log(
         `  Fetching chunk ${Math.ceil(i / BATCH_SIZE) + 1}/${Math.ceil(
-          urlsToFetch.length / BATCH_SIZE
-        )}...`
+          urlsToFetch.length / BATCH_SIZE,
+        )}...`,
       );
 
       const chunkPromises = chunk.map((url) =>
-        scrapeWithFetch(url, targets, removes)
+        scrapeWithFetch(url, targets, removes),
       );
       const chunkResults = await Promise.all(chunkPromises);
 
