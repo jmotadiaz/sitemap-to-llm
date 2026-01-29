@@ -49,8 +49,6 @@ export async function sitemapToJson(
     throw new Error(`Error al procesar el sitemap: ${(err as Error).message}`);
   }
 
-  console.log(`Fuente detectada: ${result.source}`);
-
   const { urls } = result;
 
   // Filtrar URLs

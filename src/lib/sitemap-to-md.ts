@@ -333,7 +333,6 @@ export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
     throw new Error("No se encontraron URLs en el sitemap");
   }
 
-  console.log(`Fuente detectada: ${result.source}`);
   const { filteredUrls } = filterUrls(urls, includePatterns, excludePatterns);
 
   if (filteredUrls.length === 0) {

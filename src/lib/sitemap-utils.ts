@@ -6,7 +6,6 @@ import path from "path";
 
 export interface SitemapResult {
   urls: string[];
-  source: "url" | "xml" | "json";
 }
 
 /**
@@ -175,7 +174,6 @@ export function detectFormat(
 export async function processSitemap(input: string): Promise<SitemapResult> {
   const content = await getContent(input);
   const format = detectFormat(input, content);
-  const source = isUrl(input) ? "url" : format;
 
   let urls: string[];
   if (format === "json") {
@@ -184,7 +182,7 @@ export async function processSitemap(input: string): Promise<SitemapResult> {
     urls = extractUrlsFromXml(content);
   }
 
-  return { urls, source };
+  return { urls };
 }
 
 /**
