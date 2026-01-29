@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import path from "path";
 import minimist from "minimist";
 import dotenv from "dotenv";
@@ -11,11 +9,12 @@ dotenv.config({ path: path.join(scriptDir, "../.env") });
 interface CliArgs {
   input?: string;
   output?: string;
-  engine?: "fetch" | "jina";
+  engine?: "fetch" | "jina" | "firecrawl";
   "title-type"?: "page" | "url";
   "target-selector"?: string;
   "remove-selector"?: string;
   "jina-api-key"?: string;
+  "firecrawl-api-key"?: string;
   "include-pattern"?: string | string[];
   "exclude-pattern"?: string | string[];
   help?: boolean;
@@ -33,7 +32,7 @@ function printUsage(exitCode = 1): never {
     "  -o --output           Directorio donde guardar los .md generados",
   );
   console.error(
-    "  --engine              Motor de extracción: 'fetch' (default) o 'jina'",
+    "  --engine              Motor de extracción: 'fetch' (default), 'jina' o 'firecrawl'",
   );
   console.error(
     "  --title-type          Tipo de título: 'page' (título de la página) o 'url' (segmento URL) [default: page]",
@@ -48,7 +47,7 @@ function printUsage(exitCode = 1): never {
     "  --exclude-pattern     Texto para excluir URLs que coincidan con el patrón (puede repetirse)",
   );
 
-  console.error("\nOpciones Jina Engine:");
+  console.error("\nOpciones Jina & Firecrawl Engine:");
   console.error(
     "  --target-selector     Selectores CSS a incluir (ej: 'main, #content')",
   );
@@ -57,6 +56,11 @@ function printUsage(exitCode = 1): never {
   );
   console.error(
     "  --jina-api-key        API Key de Jina (opcional si existe JINA_API_KEY en .env)",
+  );
+
+  console.error("\nOpciones Firecrawl Engine:");
+  console.error(
+    "  --firecrawl-api-key   API Key de Firecrawl (opcional si existe FIRECRAWL_API_KEY en .env)",
   );
   process.exit(exitCode);
 }
@@ -71,6 +75,7 @@ const argv = minimist<CliArgs>(process.argv.slice(2), {
     "target-selector",
     "remove-selector",
     "jina-api-key",
+    "firecrawl-api-key",
     "include-pattern",
     "exclude-pattern",
   ],
@@ -82,9 +87,9 @@ if (argv.help || !argv.input || !argv.output) {
 }
 
 const engine = argv.engine || "fetch";
-if (engine !== "fetch" && engine !== "jina") {
+if (engine !== "fetch" && engine !== "jina" && engine !== "firecrawl") {
   console.error(
-    `Error: engine debe ser 'fetch' o 'jina', recibido: '${engine}'`,
+    `Error: engine debe ser 'fetch', 'jina' o 'firecrawl', recibido: '${engine}'`,
   );
   process.exit(1);
 }
@@ -105,6 +110,7 @@ sitemapToMd({
   targetSelector: argv["target-selector"],
   removeSelector: argv["remove-selector"],
   jinaApiKey: argv["jina-api-key"],
+  firecrawlApiKey: argv["firecrawl-api-key"],
   includePatterns: argv["include-pattern"],
   excludePatterns: argv["exclude-pattern"],
 }).catch((err) => {

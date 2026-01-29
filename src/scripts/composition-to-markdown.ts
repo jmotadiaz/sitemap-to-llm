@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import path from "path";
 import minimist from "minimist";
 import dotenv from "dotenv";
@@ -16,14 +14,14 @@ interface CliArgs {
 
 function printUsage(exitCode = 1): never {
   console.error(
-    "Uso: composition-to-markdown -i <composition.json> -o <directorio-salida>"
+    "Uso: composition-to-markdown -i <composition.json> -o <directorio-salida>",
   );
   console.error("\nOpciones:");
   console.error(
-    "  -i --input            Archivo JSON de composición (default: composition.json)"
+    "  -i --input            Archivo JSON de composición (default: composition.json)",
   );
   console.error(
-    "  -o --output           Directorio donde guardar los .md generados"
+    "  -o --output           Directorio donde guardar los .md generados",
   );
   process.exit(exitCode);
 }

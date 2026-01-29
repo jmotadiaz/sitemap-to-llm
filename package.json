@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "main": "dist/index.js",
   "bin": {
-    "composition-to-markdown": "./dist/scripts/composition-to-markdown.js",
-    "sitemap-to-json": "./dist/scripts/sitemap-to-json.js",
-    "sitemap-to-txt": "./dist/scripts/sitemap-to-txt.js",
-    "sitemap-to-md": "./dist/scripts/sitemap-to-md.js"
+    "composition-to-markdown": "./scripts/composition-to-markdown.js",
+    "sitemap-to-json": "./scripts/sitemap-to-json.js",
+    "sitemap-to-txt": "./scripts/sitemap-to-txt.js",
+    "sitemap-to-md": "./scripts/sitemap-to-md.js"
   },
   "scripts": {
     "build": "rm -rf ./dist && tsc && npm run build:css && cp .env dist/.env && cp -r ./src/web/public ./dist/web/public && cp -r ./src/web/views ./dist/web/views",
@@ -30,10 +30,12 @@
     "express": "^5.2.1",
     "minimist": "^1.2.8",
     "multer": "^2.0.2",
+    "p-throttle": "^8.1.0",
     "turndown": "^7.2.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.1.18",
     "@types/adm-zip": "^0.5.7",
     "@types/express": "^5.0.6",
     "@types/minimist": "^1.2.5",
@@ -43,7 +45,6 @@
     "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.23",
     "postcss": "^8.5.6",
-    "@tailwindcss/cli": "^4.1.18",
     "tailwindcss": "^4.1.18",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.0"

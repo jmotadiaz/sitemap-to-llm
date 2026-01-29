@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import minimist from "minimist";
 import { sitemapToTxt } from "../lib/sitemap-to-txt.js";
 

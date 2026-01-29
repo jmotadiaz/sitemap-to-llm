@@ -1,205 +1,149 @@
 import fs from "fs";
 import path from "path";
 import TurndownService from "turndown";
-import { processSitemap, fetchUrl, filterUrls } from "./sitemap-utils.js";
+import FirecrawlApp from "@mendable/firecrawl-js";
+import pThrottle from "p-throttle";
+import {
+  processSitemap,
+  fetchUrl,
+  filterUrls,
+  delay,
+  extractTitleFromHtml,
+  extractBodyFromHtml,
+  determineFilename,
+} from "./sitemap-utils.js";
 
 export interface SitemapToMdOptions {
   inputPath: string;
   outDir: string;
-  engine?: "fetch" | "jina";
+  engine?: "fetch" | "jina" | "firecrawl";
   titleType?: "page" | "url";
   targetSelector?: string;
   removeSelector?: string;
   jinaApiKey?: string;
+  firecrawlApiKey?: string;
   includePatterns?: string | string[];
   excludePatterns?: string | string[];
 }
 
-// Configurar Turndown (para engine: fetch)
 const turndownService = new TurndownService({
   headingStyle: "atx",
   codeBlockStyle: "fenced",
 });
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+interface ScrapeEngine {
+  process(
+    urls: string[],
+    outDirFullPath: string,
+    options: SitemapToMdOptions,
+  ): Promise<{ success: number; error: number }>;
 }
 
-function extractTitleFromHtml(html: string): string | null {
-  const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
-  if (titleMatch && titleMatch[1]) {
-    return titleMatch[1].trim();
-  }
-  return null;
-}
+class FetchEngine implements ScrapeEngine {
+  async process(
+    urls: string[],
+    outDirFullPath: string,
+    options: SitemapToMdOptions,
+  ): Promise<{ success: number; error: number }> {
+    let successCount = 0;
+    let errorCount = 0;
+    const { titleType = "page" } = options;
 
-function extractBodyFromHtml(html: string): string {
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  return bodyMatch ? bodyMatch[1] : html;
-}
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      console.log(`[${i + 1}/${urls.length}] Descargando: ${url}`);
 
-function getLastUrlSegment(url: string): string {
-  try {
-    const urlObj = new URL(url);
-    const pathname = urlObj.pathname;
-    const segments = pathname
-      .split("/")
-      .filter((segment) => segment.length > 0);
-    if (segments.length > 0) {
-      let lastSegment = segments[segments.length - 1];
-      lastSegment = lastSegment.replace(/\.[^/.]+$/, "");
-      return lastSegment || "index";
+      try {
+        const html = await fetchUrl(url);
+        const title = extractTitleFromHtml(html);
+        const body = extractBodyFromHtml(html);
+        let markdown = turndownService.turndown(body);
+
+        if (title) {
+          markdown = `# ${title}\n\n${markdown}`;
+        }
+
+        const filename = determineFilename(
+          url,
+          title,
+          titleType,
+          i,
+          urls.length,
+        );
+        const filePath = path.join(outDirFullPath, `${filename}.md`);
+        fs.writeFileSync(filePath, markdown, "utf8");
+
+        console.log(`  ✓ Guardado: ${filename}.md`);
+        successCount++;
+      } catch (err) {
+        console.error(`  ✗ Error: ${(err as Error).message}`);
+        errorCount++;
+      }
+
+      if (i < urls.length - 1) {
+        await delay(50);
+      }
     }
-    return "index";
-  } catch {
-    return "untitled";
+    return { success: successCount, error: errorCount };
   }
 }
 
-function sanitizeFilename(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9\s-]/g, "-")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 100) || "untitled"
-  );
-}
+class JinaEngine implements ScrapeEngine {
+  private async scrapeWithJina(
+    url: string,
+    apiKey: string,
+    targetSelector?: string,
+    removeSelector?: string,
+  ): Promise<{ content: string; title: string }> {
+    const requestUrl = `https://r.jina.ai/${encodeURIComponent(url)}`;
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      "X-Md-Link-Style": "discarded",
+      "X-Md-Heading-Style": "atx",
+    };
 
-function determineFilename(
-  url: string,
-  pageTitle: string | null,
-  titleType: "page" | "url",
-  index: number,
-  total: number,
-): string {
-  let baseFilename: string;
+    if (targetSelector) headers["X-Target-Selector"] = targetSelector;
+    if (removeSelector) headers["X-Remove-Selector"] = removeSelector;
 
-  if (titleType === "page") {
-    baseFilename = sanitizeFilename(pageTitle || "untitled");
-    if (baseFilename === "untitled") {
-      baseFilename = getLastUrlSegment(url);
+    const response = await fetch(requestUrl, { headers });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-  } else {
-    baseFilename = getLastUrlSegment(url);
+
+    const textResponse = await response.text();
+    const titleMatch = textResponse.match(/^Title:\s*(.+)$/m);
+    const title = titleMatch ? titleMatch[1].trim() : "untitled";
+
+    const markdownContentMatch = textResponse.match(
+      /Markdown Content:\s*\n([\s\S]*)/i,
+    );
+    const content = markdownContentMatch
+      ? `# ${title}\n\n${markdownContentMatch[1].trim()}`
+      : textResponse;
+
+    return { content, title };
   }
 
-  if (titleType === "url") {
-    const paddingWidth = total.toString().length;
-    const paddedIndex = (index + 1).toString().padStart(paddingWidth, "0");
-    return `${paddedIndex}-${baseFilename}`;
-  }
+  async process(
+    urls: string[],
+    outDirFullPath: string,
+    options: SitemapToMdOptions,
+  ): Promise<{ success: number; error: number }> {
+    let successCount = 0;
+    let errorCount = 0;
+    const {
+      titleType = "page",
+      jinaApiKey,
+      targetSelector,
+      removeSelector,
+    } = options;
+    const finalJinaKey = jinaApiKey || process.env.JINA_API_KEY || "";
 
-  return baseFilename;
-}
-
-async function scrapeWithJina(
-  url: string,
-  apiKey: string,
-  targetSelector?: string,
-  removeSelector?: string,
-): Promise<{ content: string; title: string }> {
-  const requestUrl = `https://r.jina.ai/${encodeURIComponent(url)}`;
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${apiKey}`,
-    "X-Md-Link-Style": "discarded",
-    "X-Md-Heading-Style": "atx",
-  };
-
-  if (targetSelector) headers["X-Target-Selector"] = targetSelector;
-  if (removeSelector) headers["X-Remove-Selector"] = removeSelector;
-
-  const response = await fetch(requestUrl, { headers });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  const textResponse = await response.text();
-
-  const titleMatch = textResponse.match(/^Title:\s*(.+)$/m);
-  const title = titleMatch ? titleMatch[1].trim() : "untitled";
-
-  const markdownContentMatch = textResponse.match(
-    /Markdown Content:\s*\n([\s\S]*)/i,
-  );
-  const content = markdownContentMatch
-    ? `# ${title}\n\n${markdownContentMatch[1].trim()}`
-    : textResponse;
-
-  return { content, title };
-}
-
-export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
-  const {
-    inputPath,
-    outDir,
-    engine = "fetch",
-    titleType = "page",
-    targetSelector,
-    removeSelector,
-    jinaApiKey,
-    includePatterns = [],
-    excludePatterns = [],
-  } = options;
-
-  const outDirFullPath = path.isAbsolute(outDir)
-    ? outDir
-    : path.join(process.cwd(), outDir);
-
-  let finalJinaKey = "";
-  if (engine === "jina") {
-    finalJinaKey = jinaApiKey || process.env.JINA_API_KEY || "";
     if (!finalJinaKey) {
-      console.error(
-        "Error: JINA_API_KEY es requerida para el motor Jina. Úsala en .env o como argumento.",
-      );
-      throw new Error(
-        "Error: JINA_API_KEY es requerida para el motor Jina. Úsala en .env o como argumento.",
-      );
+      throw new Error("JINA_API_KEY es requerida para el motor Jina.");
     }
-  }
 
-  console.log(`Procesando sitemap: ${inputPath} [Engine: ${engine}]`);
-
-  let result;
-  try {
-    result = await processSitemap(inputPath);
-  } catch (err) {
-    console.error(`Error al procesar el sitemap: ${(err as Error).message}`);
-    throw new Error(`Error al procesar el sitemap: ${(err as Error).message}`);
-  }
-
-  const { urls } = result;
-  if (urls.length === 0) {
-    console.error("No se encontraron URLs en el sitemap");
-    throw new Error("No se encontraron URLs en el sitemap");
-  }
-
-  console.log(`Fuente detectada: ${result.source}`);
-
-  const { filteredUrls } = filterUrls(urls, includePatterns, excludePatterns);
-  const finalUrls = filteredUrls;
-
-  if (finalUrls.length === 0) {
-    console.error("No quedan URLs después de filtrar");
-    throw new Error("No quedan URLs después de filtrar");
-  }
-
-  if (!fs.existsSync(outDirFullPath)) {
-    fs.mkdirSync(outDirFullPath, { recursive: true });
-  }
-
-  console.log(`Procesando ${finalUrls.length} URLs...`);
-
-  let successCount = 0;
-  let errorCount = 0;
-
-  if (engine === "jina") {
     const BATCH_SIZE = 50;
     const chunkArray = <T>(arr: T[], size: number): T[][] => {
       const chunks: T[][] = [];
@@ -208,7 +152,7 @@ export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
       return chunks;
     };
 
-    const urlChunks = chunkArray(finalUrls, BATCH_SIZE);
+    const urlChunks = chunkArray(urls, BATCH_SIZE);
 
     for (let chunkIndex = 0; chunkIndex < urlChunks.length; chunkIndex++) {
       const chunk = urlChunks[chunkIndex];
@@ -223,9 +167,9 @@ export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
           const currentIndex = startIndex + i;
           try {
             console.log(
-              `[${currentIndex + 1}/${finalUrls.length}] Procesando: ${url}`,
+              `[${currentIndex + 1}/${urls.length}] Procesando: ${url}`,
             );
-            const { content, title } = await scrapeWithJina(
+            const { content, title } = await this.scrapeWithJina(
               url,
               finalJinaKey,
               targetSelector,
@@ -237,7 +181,7 @@ export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
               title,
               titleType,
               currentIndex,
-              finalUrls.length,
+              urls.length,
             );
             const filePath = path.join(outDirFullPath, `${filename}.md`);
             fs.writeFileSync(filePath, content, "utf8");
@@ -256,45 +200,157 @@ export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
         else errorCount++;
       });
     }
-  } else {
-    for (let i = 0; i < finalUrls.length; i++) {
-      const url = finalUrls[i];
-      console.log(`[${i + 1}/${finalUrls.length}] Descargando: ${url}`);
+    return { success: successCount, error: errorCount };
+  }
+}
+
+class FirecrawlEngine implements ScrapeEngine {
+  async process(
+    urls: string[],
+    outDirFullPath: string,
+    options: SitemapToMdOptions,
+  ): Promise<{ success: number; error: number }> {
+    let successCount = 0;
+    let errorCount = 0;
+    const { titleType = "page", firecrawlApiKey } = options;
+    const apiKey = firecrawlApiKey || process.env.FIRECRAWL_API_KEY || "";
+
+    if (!apiKey) {
+      throw new Error(
+        "FIRECRAWL_API_KEY es requerida para el motor Firecrawl.",
+      );
+    }
+
+    const firecrawl = new (FirecrawlApp as any)({ apiKey });
+
+    const throttle = pThrottle({
+      limit: 10,
+      interval: 61000,
+    });
+
+    const throttledScrape = throttle(async (url: string) => {
+      const scrapeOptions: any = {
+        formats: ["markdown"],
+        onlyMainContent: true,
+      };
+
+      if (options.targetSelector) {
+        scrapeOptions.includeTags = options.targetSelector
+          .split(",")
+          .map((s) => s.trim());
+      }
+
+      if (options.removeSelector) {
+        scrapeOptions.excludeTags = options.removeSelector
+          .split(",")
+          .map((s) => s.trim());
+      }
+
+      return await firecrawl.scrapeUrl(url, scrapeOptions);
+    });
+
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      console.log(`[${i + 1}/${urls.length}] Procesando con Firecrawl: ${url}`);
 
       try {
-        const html = await fetchUrl(url);
-        const title = extractTitleFromHtml(html);
-        const body = extractBodyFromHtml(html);
-        let markdown = turndownService.turndown(body);
+        const response = await throttledScrape(url);
 
-        if (title) {
-          markdown = `# ${title}\n\n${markdown}`;
+        if (!response.success) {
+          throw new Error(
+            response.error || "Error desconocido al scrapear con Firecrawl",
+          );
         }
+
+        const title =
+          response.metadata?.title ||
+          extractTitleFromHtml(response.html || "") ||
+          "untitled";
+        const content = response.markdown || "";
+
+        const finalContent = `# ${title}\n\n${content}`;
 
         const filename = determineFilename(
           url,
           title,
           titleType,
           i,
-          finalUrls.length,
+          urls.length,
         );
         const filePath = path.join(outDirFullPath, `${filename}.md`);
-        fs.writeFileSync(filePath, markdown, "utf8");
+        fs.writeFileSync(filePath, finalContent, "utf8");
 
         console.log(`  ✓ Guardado: ${filename}.md`);
         successCount++;
       } catch (err) {
-        console.error(`  ✗ Error: ${(err as Error).message}`);
+        console.error(`  ✗ Error en ${url}: ${(err as Error).message}`);
         errorCount++;
       }
-
-      if (i < finalUrls.length - 1) {
-        await delay(50);
-      }
     }
+
+    return { success: successCount, error: errorCount };
+  }
+}
+
+export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
+  const {
+    inputPath,
+    outDir,
+    engine = "fetch",
+    includePatterns = [],
+    excludePatterns = [],
+  } = options;
+
+  const outDirFullPath = path.isAbsolute(outDir)
+    ? outDir
+    : path.join(process.cwd(), outDir);
+
+  let scraper: ScrapeEngine;
+  switch (engine) {
+    case "jina":
+      scraper = new JinaEngine();
+      break;
+    case "firecrawl":
+      scraper = new FirecrawlEngine();
+      break;
+    case "fetch":
+    default:
+      scraper = new FetchEngine();
+      break;
   }
 
-  console.log(
-    `\n✅ Completado: ${successCount} exitosos, ${errorCount} errores`,
+  console.log(`Procesando sitemap: ${inputPath} [Engine: ${engine}]`);
+
+  let result;
+  try {
+    result = await processSitemap(inputPath);
+  } catch (err) {
+    throw new Error(`Error al procesar el sitemap: ${(err as Error).message}`);
+  }
+
+  const { urls } = result;
+  if (urls.length === 0) {
+    throw new Error("No se encontraron URLs en el sitemap");
+  }
+
+  console.log(`Fuente detectada: ${result.source}`);
+  const { filteredUrls } = filterUrls(urls, includePatterns, excludePatterns);
+
+  if (filteredUrls.length === 0) {
+    throw new Error("No quedan URLs después de filtrar");
+  }
+
+  if (!fs.existsSync(outDirFullPath)) {
+    fs.mkdirSync(outDirFullPath, { recursive: true });
+  }
+
+  console.log(`Procesando ${filteredUrls.length} URLs...`);
+
+  const { success, error } = await scraper.process(
+    filteredUrls,
+    outDirFullPath,
+    options,
   );
+
+  console.log(`\n✅ Completado: ${success} exitosos, ${error} errores`);
 }

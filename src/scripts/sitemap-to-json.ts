@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import minimist from "minimist";
 import { sitemapToJson } from "../lib/sitemap-to-json.js";
 

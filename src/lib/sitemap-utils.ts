@@ -270,3 +270,79 @@ export function filterUrls(
     urlsAfterExclude,
   };
 }
+
+export function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function extractTitleFromHtml(html: string): string | null {
+  const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+  if (titleMatch && titleMatch[1]) {
+    return titleMatch[1].trim();
+  }
+  return null;
+}
+
+export function extractBodyFromHtml(html: string): string {
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  return bodyMatch ? bodyMatch[1] : html;
+}
+
+export function getLastUrlSegment(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname;
+    const segments = pathname
+      .split("/")
+      .filter((segment) => segment.length > 0);
+    if (segments.length > 0) {
+      let lastSegment = segments[segments.length - 1];
+      lastSegment = lastSegment.replace(/\.[^/.]+$/, "");
+      return lastSegment || "index";
+    }
+    return "index";
+  } catch {
+    return "untitled";
+  }
+}
+
+export function sanitizeFilename(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s-]/g, "-")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 100) || "untitled"
+  );
+}
+
+export function determineFilename(
+  url: string,
+  pageTitle: string | null,
+  titleType: "page" | "url",
+  index: number,
+  total: number,
+): string {
+  let baseFilename: string;
+
+  if (titleType === "page") {
+    baseFilename = sanitizeFilename(pageTitle || "untitled");
+    if (baseFilename === "untitled") {
+      baseFilename = getLastUrlSegment(url);
+    }
+  } else {
+    baseFilename = getLastUrlSegment(url);
+  }
+
+  if (titleType === "url") {
+    const paddingWidth = total.toString().length;
+    const paddedIndex = (index + 1).toString().padStart(paddingWidth, "0");
+    return `${paddedIndex}-${baseFilename}`;
+  }
+
+  return baseFilename;
+}
