@@ -14,18 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
             submitBtn.disabled = true;
 
             const formData = new FormData(form);
-            const params = new URLSearchParams();
-            for (const [key, value] of formData) {
-                params.append(key, value);
-            }
 
             try {
                 const response = await fetch(form.action, {
                     method: 'POST',
-                    body: params,
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
+                    body: formData,
                 });
 
                 if (!response.ok) {

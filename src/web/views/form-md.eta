@@ -14,11 +14,26 @@
         <div class="absolute inset-0 -m-8 bg-space-900/50 rounded-3xl border border-white/5 -z-10"></div>
 
         <!-- Input URL -->
-        <div class="space-y-3">
-            <label for="input" class="block text-sm font-medium text-slate-300">Sitemap URL <span class="text-red-400">*</span></label>
-            <div class="relative group">
-                <input type="url" name="input" id="input" required placeholder="https://example.com/sitemap.xml"
-                    class="w-full bg-space-950 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all group-hover:border-white/20">
+        <div class="space-y-6">
+            <div class="space-y-3">
+                <label for="input" class="block text-sm font-medium text-slate-300">Sitemap URL <span class="text-slate-500 text-xs">(Option 1)</span></label>
+                <div class="relative group">
+                    <input type="url" name="input" id="input" placeholder="https://example.com/sitemap.xml"
+                        class="w-full bg-space-950 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all group-hover:border-white/20">
+                </div>
+            </div>
+
+            <div class="relative flex items-center py-2">
+                <div class="flex-grow border-t border-white/10"></div>
+                <span class="flex-shrink-0 mx-4 text-slate-500 text-xs uppercase">OR</span>
+                <div class="flex-grow border-t border-white/10"></div>
+            </div>
+
+            <div class="space-y-3">
+                <label for="file" class="block text-sm font-medium text-slate-300">Upload Sitemap File <span class="text-slate-500 text-xs">(Option 2)</span></label>
+                <input type="file" name="file" id="file" accept=".xml,.json"
+                    class="w-full bg-space-950 border border-white/10 rounded-xl px-4 py-3 text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-white file:text-black hover:file:bg-slate-200 cursor-pointer transition-all">
+                <p class="text-xs text-slate-500">Supports XML sitemaps or JSON indexes.</p>
             </div>
         </div>
 

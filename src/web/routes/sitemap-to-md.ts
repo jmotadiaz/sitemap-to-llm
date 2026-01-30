@@ -4,14 +4,16 @@ import path from "path";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import archiver from "archiver";
+import multer from "multer";
 
 const router = Router();
+const upload = multer({ dest: path.join(__dirname, "../../../tmp/uploads") });
 
 router.get("/", (req, res) => {
   res.render("form-md", { title: "Sitemap to Markdown", path: "/md" });
 });
 
-router.post("/", async (req, res) => {
+router.post("/", upload.single("file"), async (req, res) => {
   const {
     input,
     engine,
@@ -21,9 +23,12 @@ router.post("/", async (req, res) => {
     target_selector,
     remove_selector,
   } = req.body;
+  const file = req.file;
 
-  if (!input) {
-    return res.status(400).send("Input URL is required");
+  const inputPath = file ? file.path : input;
+
+  if (!inputPath) {
+    return res.status(400).send("Input URL or File is required");
   }
 
   const includePatterns = include_patterns
@@ -45,7 +50,7 @@ router.post("/", async (req, res) => {
 
   try {
     await sitemapToMd({
-      inputPath: input,
+      inputPath: inputPath,
       outDir: outputDir,
       engine: engine || "fetch",
       titleType: title_type || "page",
@@ -74,6 +79,9 @@ router.post("/", async (req, res) => {
           if (fs.existsSync(zipPath)) {
             fs.unlinkSync(zipPath);
           }
+          if (file && fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
         } catch (cleanupErr) {
           console.error("Cleanup error:", cleanupErr);
         }
@@ -93,6 +101,9 @@ router.post("/", async (req, res) => {
     try {
       if (fs.existsSync(outputDir)) {
         fs.rmSync(outputDir, { recursive: true, force: true });
+      }
+      if (file && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
       }
     } catch {}
 
