@@ -3,18 +3,23 @@ import { sitemapToJson } from "../../lib/sitemap-to-json";
 import path from "path";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
+import multer from "multer";
 
 const router = Router();
+const upload = multer({ dest: path.join(__dirname, "../../../tmp/uploads") });
 
 router.get("/", (req, res) => {
   res.render("form-json", { title: "Sitemap to JSON", path: "/json" });
 });
 
-router.post("/", async (req, res) => {
+router.post("/", upload.single("file"), async (req, res) => {
   const { input, include_patterns, exclude_patterns } = req.body;
+  const file = req.file;
 
-  if (!input) {
-    return res.status(400).send("Input URL is required");
+  const inputPath = file ? file.path : input;
+
+  if (!inputPath) {
+    return res.status(400).send("Input URL or File is required");
   }
 
   const includePatterns = include_patterns
@@ -34,7 +39,7 @@ router.post("/", async (req, res) => {
 
   try {
     await sitemapToJson({
-      inputPath: input,
+      inputPath: inputPath,
       outputPath: outputPath,
       includePatterns,
       excludePatterns,
@@ -47,9 +52,15 @@ router.post("/", async (req, res) => {
       if (fs.existsSync(outputPath)) {
         fs.unlinkSync(outputPath);
       }
+      if (file && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
     });
   } catch (error) {
     console.error("Error processing sitemap:", error);
+    if (file && fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
     res
       .status(500)
       .send(`Error processing sitemap: ${(error as Error).message}`);
