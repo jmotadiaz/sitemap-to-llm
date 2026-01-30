@@ -7,7 +7,10 @@ import archiver from "archiver";
 import multer from "multer";
 
 const router = Router();
-const upload = multer({ dest: path.join(__dirname, "../../../tmp/uploads") });
+const upload = multer({
+  dest: path.join(__dirname, "../../../tmp/uploads"),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+});
 
 router.get("/", (req, res) => {
   res.render("form-md", { title: "Sitemap to Markdown", path: "/md" });
