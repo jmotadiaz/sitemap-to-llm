@@ -52,7 +52,7 @@ router.post("/", upload.single("file"), async (req, res) => {
     await sitemapToMd({
       inputPath: inputPath,
       outDir: outputDir,
-      engine: engine || "fetch",
+      engine: engine || "turndown",
       titleType: title_type || "page",
       includePatterns,
       excludePatterns,

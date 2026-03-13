@@ -42,7 +42,8 @@
             <div class="space-y-3">
                 <label for="engine" class="block text-sm font-medium text-slate-300">Extraction Engine</label>
                 <select name="engine" id="engine" class="w-full bg-space-950 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all appearance-none">
-                    <option value="fetch">Fetch (Default)</option>
+                    <option value="turndown">Turndown (Default)</option>
+                    <option value="fetch">Fetch (.md)</option>
                     <option value="jina">Jina Reader</option>
                     <option value="firecrawl">Firecrawl</option>
                 </select>

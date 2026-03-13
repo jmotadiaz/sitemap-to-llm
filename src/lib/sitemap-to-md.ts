@@ -16,7 +16,7 @@ import {
 export interface SitemapToMdOptions {
   inputPath: string;
   outDir: string;
-  engine?: "fetch" | "jina" | "firecrawl";
+  engine?: "turndown" | "fetch" | "jina" | "firecrawl";
   titleType?: "page" | "url";
   targetSelector?: string;
   removeSelector?: string;
@@ -39,7 +39,7 @@ interface ScrapeEngine {
   ): Promise<{ success: number; error: number }>;
 }
 
-class FetchEngine implements ScrapeEngine {
+class TurndownEngine implements ScrapeEngine {
   async process(
     urls: string[],
     outDirFullPath: string,
@@ -66,6 +66,52 @@ class FetchEngine implements ScrapeEngine {
         const filename = determineFilename(
           url,
           title,
+          titleType,
+          i,
+          urls.length,
+        );
+        const filePath = path.join(outDirFullPath, `${filename}.md`);
+        fs.writeFileSync(filePath, markdown, "utf8");
+
+        console.log(`  ✓ Guardado: ${filename}.md`);
+        successCount++;
+      } catch (err) {
+        console.error(`  ✗ Error: ${(err as Error).message}`);
+        errorCount++;
+      }
+
+      if (i < urls.length - 1) {
+        await delay(50);
+      }
+    }
+    return { success: successCount, error: errorCount };
+  }
+}
+
+class FetchEngine implements ScrapeEngine {
+  async process(
+    urls: string[],
+    outDirFullPath: string,
+    options: SitemapToMdOptions,
+  ): Promise<{ success: number; error: number }> {
+    let successCount = 0;
+    let errorCount = 0;
+    const { titleType = "page" } = options;
+
+    for (let i = 0; i < urls.length; i++) {
+      let url = urls[i];
+      // Try to append .md to URL if it doesn't have it
+      if (!url.endsWith('.md')) {
+        url = url.endsWith('/') ? `${url}index.md` : `${url}.md`;
+      }
+      console.log(`[${i + 1}/${urls.length}] Descargando: ${url}`);
+
+      try {
+        const markdown = await fetchUrl(url);
+
+        const filename = determineFilename(
+          url,
+          null, // Title is not easily extracted from raw MD download
           titleType,
           i,
           urls.length,
@@ -296,7 +342,7 @@ export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
   const {
     inputPath,
     outDir,
-    engine = "fetch",
+    engine = "turndown",
     includePatterns = [],
     excludePatterns = [],
   } = options;
@@ -313,8 +359,11 @@ export async function sitemapToMd(options: SitemapToMdOptions): Promise<void> {
     case "firecrawl":
       scraper = new FirecrawlEngine();
       break;
-    case "fetch":
+    case "turndown":
     default:
+      scraper = new TurndownEngine();
+      break;
+    case "fetch":
       scraper = new FetchEngine();
       break;
   }
