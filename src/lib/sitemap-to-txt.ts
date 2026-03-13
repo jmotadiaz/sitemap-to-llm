@@ -7,6 +7,7 @@ export interface SitemapToTxtOptions {
   outputPath?: string;
   includePatterns?: string | string[];
   excludePatterns?: string | string[];
+  addMdExt?: boolean;
 }
 
 function generateOutputPath(inputPath: string): string {
@@ -37,6 +38,7 @@ export async function sitemapToTxt(
     outputPath: customOutputPath,
     includePatterns = [],
     excludePatterns = [],
+    addMdExt = false,
   } = options;
 
   console.log(`Procesando: ${inputPath}`);
@@ -52,11 +54,15 @@ export async function sitemapToTxt(
   const { urls } = result;
 
   // Filtrar URLs
-  const { filteredUrls, urlsBeforeInclude } = filterUrls(
+  let { filteredUrls, urlsBeforeInclude } = filterUrls(
     urls,
     includePatterns,
     excludePatterns,
   );
+
+  if (addMdExt) {
+    filteredUrls = filteredUrls.map((url) => url.replace(/\/$/, "") + ".md");
+  }
 
   if (filteredUrls.length === 0) {
     console.error(

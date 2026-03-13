@@ -6,6 +6,7 @@ interface CliArgs {
   output?: string;
   "include-pattern"?: string | string[];
   "exclude-pattern"?: string | string[];
+  "add-md-ext"?: boolean;
   help?: boolean;
 }
 
@@ -23,13 +24,14 @@ function printUsage(exitCode = 1): never {
   console.error(
     "  --exclude-pattern     Texto para excluir URLs que coincidan con el patrón (puede repetirse)",
   );
+  console.error("  --add-md-ext          Añade un sufijo .md a cada URL");
   process.exit(exitCode);
 }
 
 const argv = minimist<CliArgs>(process.argv.slice(2), {
   alias: { i: "input", o: "output", h: "help" },
   string: ["input", "output", "include-pattern", "exclude-pattern"],
-  boolean: ["help"],
+  boolean: ["help", "add-md-ext"],
 });
 
 if (argv.help || !argv.input) {
@@ -41,6 +43,7 @@ sitemapToTxt({
   outputPath: argv.output,
   includePatterns: argv["include-pattern"],
   excludePatterns: argv["exclude-pattern"],
+  addMdExt: argv["add-md-ext"],
 }).catch((err) => {
   console.error("Error fatal:", err);
   process.exit(1);

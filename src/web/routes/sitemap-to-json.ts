@@ -28,6 +28,7 @@ router.post("/", upload.single("file"), async (req, res) => {
   const excludePatterns = exclude_patterns
     ? exclude_patterns.split(",").map((p: string) => p.trim())
     : undefined;
+  const addMdExt = req.body.add_md_ext === "on";
 
   const tmpId = uuidv4();
   const outputPath = path.join(__dirname, `../../../tmp/sitemap-${tmpId}.json`);
@@ -43,6 +44,7 @@ router.post("/", upload.single("file"), async (req, res) => {
       outputPath: outputPath,
       includePatterns,
       excludePatterns,
+      addMdExt,
     });
 
     res.download(outputPath, "sitemap.json", (err) => {

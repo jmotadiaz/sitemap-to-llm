@@ -57,6 +57,19 @@
             </div>
         </div>
 
+        <!-- Additional Options -->
+        <div class="space-y-3">
+            <label class="flex items-center space-x-3 cursor-pointer group">
+                <div class="relative flex items-center justify-center w-6 h-6">
+                    <input type="checkbox" name="add_md_ext" id="add_md_ext" class="peer appearance-none w-6 h-6 border border-white/10 rounded-md bg-space-950 checked:bg-accent-500 checked:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all">
+                    <svg class="absolute w-4 h-4 text-white opacity-0 peer-checked:opacity-100 pointer-events-none transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <span class="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">Add .md extension to URLs</span>
+            </label>
+        </div>
+
         <div class="pt-4">
             <button type="submit" class="w-full bg-gradient-to-r from-accent-600 to-brand-500 hover:from-accent-500 hover:to-brand-400 text-white font-bold py-4 rounded-xl shadow-lg shadow-accent-500/25 transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2">
                 <div class="spinner"></div>
