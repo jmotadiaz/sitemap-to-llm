@@ -9,7 +9,7 @@ dotenv.config({ path: path.join(scriptDir, "../.env") });
 interface CliArgs {
   input?: string;
   output?: string;
-  engine?: "fetch" | "jina" | "firecrawl";
+  engine?: "turndown" | "fetch" | "jina" | "firecrawl";
   "title-type"?: "page" | "url";
   "target-selector"?: string;
   "remove-selector"?: string;
@@ -32,7 +32,7 @@ function printUsage(exitCode = 1): never {
     "  -o --output           Directorio donde guardar los .md generados",
   );
   console.error(
-    "  --engine              Motor de extracción: 'fetch' (default), 'jina' o 'firecrawl'",
+    "  --engine              Motor de extracción: 'turndown' (default), 'fetch', 'jina' o 'firecrawl'",
   );
   console.error(
     "  --title-type          Tipo de título: 'page' (título de la página) o 'url' (segmento URL) [default: page]",
@@ -86,10 +86,10 @@ if (argv.help || !argv.input || !argv.output) {
   printUsage(argv.help ? 0 : 1);
 }
 
-const engine = argv.engine || "fetch";
-if (engine !== "fetch" && engine !== "jina" && engine !== "firecrawl") {
+const engine = argv.engine || "turndown";
+if (engine !== "turndown" && engine !== "fetch" && engine !== "jina" && engine !== "firecrawl") {
   console.error(
-    `Error: engine debe ser 'fetch', 'jina' o 'firecrawl', recibido: '${engine}'`,
+    `Error: engine debe ser 'turndown', 'fetch', 'jina' o 'firecrawl', recibido: '${engine}'`,
   );
   process.exit(1);
 }
