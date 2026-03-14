@@ -49,38 +49,63 @@ class TurndownEngine implements ScrapeEngine {
     let errorCount = 0;
     const { titleType = "page" } = options;
 
-    for (let i = 0; i < urls.length; i++) {
-      const url = urls[i];
-      console.log(`[${i + 1}/${urls.length}] Descargando: ${url}`);
+    const BATCH_SIZE = 20;
+    const chunkArray = <T>(arr: T[], size: number): T[][] => {
+      const chunks: T[][] = [];
+      for (let i = 0; i < arr.length; i += size)
+        chunks.push(arr.slice(i, i + size));
+      return chunks;
+    };
 
-      try {
-        const html = await fetchUrl(url);
-        const title = extractTitleFromHtml(html);
-        const body = extractBodyFromHtml(html);
-        let markdown = turndownService.turndown(body);
+    const urlChunks = chunkArray(urls, BATCH_SIZE);
 
-        if (title) {
-          markdown = `# ${title}\n\n${markdown}`;
-        }
+    for (let chunkIndex = 0; chunkIndex < urlChunks.length; chunkIndex++) {
+      const chunk = urlChunks[chunkIndex];
+      const startIndex = chunkIndex * BATCH_SIZE;
 
-        const filename = determineFilename(
-          url,
-          title,
-          titleType,
-          i,
-          urls.length,
-        );
-        const filePath = path.join(outDirFullPath, `${filename}.md`);
-        fs.writeFileSync(filePath, markdown, "utf8");
+      console.log(
+        `\n📦 Procesando lote ${chunkIndex + 1}/${urlChunks.length} (${chunk.length} URLs)...`,
+      );
 
-        console.log(`  ✓ Guardado: ${filename}.md`);
-        successCount++;
-      } catch (err) {
-        console.error(`  ✗ Error: ${(err as Error).message}`);
-        errorCount++;
-      }
+      const results = await Promise.all(
+        chunk.map(async (url, i) => {
+          const currentIndex = startIndex + i;
+          try {
+            console.log(`[${currentIndex + 1}/${urls.length}] Descargando: ${url}`);
+            const html = await fetchUrl(url);
+            const title = extractTitleFromHtml(html);
+            const body = extractBodyFromHtml(html);
+            let markdown = turndownService.turndown(body);
 
-      if (i < urls.length - 1) {
+            if (title) {
+              markdown = `# ${title}\n\n${markdown}`;
+            }
+
+            const filename = determineFilename(
+              url,
+              title,
+              titleType,
+              currentIndex,
+              urls.length,
+            );
+            const filePath = path.join(outDirFullPath, `${filename}.md`);
+            fs.writeFileSync(filePath, markdown, "utf8");
+
+            console.log(`  ✓ Guardado: ${filename}.md`);
+            return true;
+          } catch (err) {
+            console.error(`  ✗ Error en ${url}: ${(err as Error).message}`);
+            return false;
+          }
+        }),
+      );
+
+      results.forEach((success) => {
+        if (success) successCount++;
+        else errorCount++;
+      });
+
+      if (chunkIndex < urlChunks.length - 1) {
         await delay(50);
       }
     }
@@ -98,35 +123,62 @@ class FetchEngine implements ScrapeEngine {
     let errorCount = 0;
     const { titleType = "page" } = options;
 
-    for (let i = 0; i < urls.length; i++) {
-      let url = urls[i];
-      // Try to append .md to URL if it doesn't have it
-      if (!url.endsWith('.md')) {
-        url = url.endsWith('/') ? `${url}index.md` : `${url}.md`;
-      }
-      console.log(`[${i + 1}/${urls.length}] Descargando: ${url}`);
+    const BATCH_SIZE = 20;
+    const chunkArray = <T>(arr: T[], size: number): T[][] => {
+      const chunks: T[][] = [];
+      for (let i = 0; i < arr.length; i += size)
+        chunks.push(arr.slice(i, i + size));
+      return chunks;
+    };
 
-      try {
-        const markdown = await fetchUrl(url);
+    const urlChunks = chunkArray(urls, BATCH_SIZE);
 
-        const filename = determineFilename(
-          url,
-          null, // Title is not easily extracted from raw MD download
-          titleType,
-          i,
-          urls.length,
-        );
-        const filePath = path.join(outDirFullPath, `${filename}.md`);
-        fs.writeFileSync(filePath, markdown, "utf8");
+    for (let chunkIndex = 0; chunkIndex < urlChunks.length; chunkIndex++) {
+      const chunk = urlChunks[chunkIndex];
+      const startIndex = chunkIndex * BATCH_SIZE;
 
-        console.log(`  ✓ Guardado: ${filename}.md`);
-        successCount++;
-      } catch (err) {
-        console.error(`  ✗ Error: ${(err as Error).message}`);
-        errorCount++;
-      }
+      console.log(
+        `\n📦 Procesando lote ${chunkIndex + 1}/${urlChunks.length} (${chunk.length} URLs)...`,
+      );
 
-      if (i < urls.length - 1) {
+      const results = await Promise.all(
+        chunk.map(async (originalUrl, i) => {
+          const currentIndex = startIndex + i;
+          let url = originalUrl;
+          // Try to append .md to URL if it doesn't have it
+          if (!url.endsWith('.md')) {
+            url = url.endsWith('/') ? `${url}index.md` : `${url}.md`;
+          }
+
+          try {
+            console.log(`[${currentIndex + 1}/${urls.length}] Descargando: ${url}`);
+            const markdown = await fetchUrl(url);
+
+            const filename = determineFilename(
+              url,
+              null, // Title is not easily extracted from raw MD download
+              titleType,
+              currentIndex,
+              urls.length,
+            );
+            const filePath = path.join(outDirFullPath, `${filename}.md`);
+            fs.writeFileSync(filePath, markdown, "utf8");
+
+            console.log(`  ✓ Guardado: ${filename}.md`);
+            return true;
+          } catch (err) {
+            console.error(`  ✗ Error en ${url}: ${(err as Error).message}`);
+            return false;
+          }
+        }),
+      );
+
+      results.forEach((success) => {
+        if (success) successCount++;
+        else errorCount++;
+      });
+
+      if (chunkIndex < urlChunks.length - 1) {
         await delay(50);
       }
     }
