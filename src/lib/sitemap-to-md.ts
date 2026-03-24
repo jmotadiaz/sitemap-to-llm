@@ -31,6 +31,36 @@ const turndownService = new TurndownService({
   codeBlockStyle: "fenced",
 });
 
+turndownService.addRule("removeDistractions", {
+  filter: [
+    "script",
+    "style",
+    "nav",
+    "header",
+    "footer",
+    "aside",
+    "form",
+    "iframe",
+    "button",
+    "input",
+    "select",
+    "textarea",
+    "noscript",
+    "canvas",
+    "dialog",
+    "menu",
+  ],
+  replacement: () => "",
+});
+
+turndownService.addRule("soloTextoEnEnlaces", {
+  filter: "a", // Identifica todas las etiquetas <a>
+  replacement: function (content) {
+    // 'content' es el texto que está dentro del enlace
+    return content;
+  },
+});
+
 interface ScrapeEngine {
   process(
     urls: string[],

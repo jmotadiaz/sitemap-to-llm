@@ -24,6 +24,16 @@ export function extractUrlsFromXml(xmlContent: string): string[] {
 }
 
 /**
+ * Extrae URLs de un archivo de texto con una URL por línea
+ */
+export function extractUrlsFromTxt(txtContent: string): string[] {
+  return txtContent
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && isUrl(line));
+}
+
+/**
  * Extrae URLs de un JSON con formato {urls: string[]} o string[]
  */
 export function extractUrlsFromJson(jsonContent: string): string[] {
@@ -151,15 +161,19 @@ export async function getContent(pathOrUrl: string): Promise<string> {
 export function detectFormat(
   pathOrUrl: string,
   content: string,
-): "xml" | "json" {
+): "xml" | "json" | "txt" {
   // Primero intentar por extensión
   const lowerPath = pathOrUrl.toLowerCase();
   if (lowerPath.endsWith(".json")) return "json";
   if (lowerPath.endsWith(".xml")) return "xml";
+  if (lowerPath.endsWith(".txt")) return "txt";
 
   // Si no hay extensión clara, detectar por contenido
   if (isJsonContent(content)) return "json";
-  return "xml";
+  if (isXmlContent(content)) return "xml";
+
+  // Por defecto, si parece una lista de URLs
+  return "txt";
 }
 
 /**
@@ -178,6 +192,8 @@ export async function processSitemap(input: string): Promise<SitemapResult> {
   let urls: string[];
   if (format === "json") {
     urls = extractUrlsFromJson(content);
+  } else if (format === "txt") {
+    urls = extractUrlsFromTxt(content);
   } else {
     urls = extractUrlsFromXml(content);
   }
