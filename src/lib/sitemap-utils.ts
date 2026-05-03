@@ -232,17 +232,21 @@ export function filterUrls(
 } {
   const urlsBeforeInclude = urls.length;
 
-  // Normalizar a arrays
-  const includes = Array.isArray(includePatterns)
-    ? includePatterns
-    : includePatterns
-      ? [includePatterns]
-      : [];
-  const excludes = Array.isArray(excludePatterns)
-    ? excludePatterns
-    : excludePatterns
-      ? [excludePatterns]
-      : [];
+  // Normalizar a arrays y eliminar patrones vacíos
+  const includes = (
+    Array.isArray(includePatterns)
+      ? includePatterns
+      : includePatterns
+        ? [includePatterns]
+        : []
+  ).filter((p) => p.length > 0);
+  const excludes = (
+    Array.isArray(excludePatterns)
+      ? excludePatterns
+      : excludePatterns
+        ? [excludePatterns]
+        : []
+  ).filter((p) => p.length > 0);
 
   // Primero aplicar includePatterns (si hay alguno)
   // Si no hay includePatterns, se mantienen todas las URLs
