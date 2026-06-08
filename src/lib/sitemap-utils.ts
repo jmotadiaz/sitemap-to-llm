@@ -232,24 +232,38 @@ export function filterUrls(
 } {
   const urlsBeforeInclude = urls.length;
 
-  // Normalizar a arrays
-  const includes = Array.isArray(includePatterns)
-    ? includePatterns
-    : includePatterns
-      ? [includePatterns]
-      : [];
-  const excludes = Array.isArray(excludePatterns)
-    ? excludePatterns
-    : excludePatterns
-      ? [excludePatterns]
-      : [];
+  // Normalizar a arrays y eliminar patrones vacíos
+  const includes = (
+    Array.isArray(includePatterns)
+      ? includePatterns
+      : includePatterns
+        ? [includePatterns]
+        : []
+  ).filter((p) => p.length > 0);
+  const excludes = (
+    Array.isArray(excludePatterns)
+      ? excludePatterns
+      : excludePatterns
+        ? [excludePatterns]
+        : []
+  ).filter((p) => p.length > 0);
+
+  // Compara el patrón contra el path de la URL para evitar falsos positivos
+  // con el dominio (ej: "de" coincidiría con "opencode.ai" si se usara la URL completa)
+  const matchesPattern = (url: string, pattern: string): boolean => {
+    try {
+      return new URL(url).pathname.includes(pattern);
+    } catch {
+      return url.includes(pattern);
+    }
+  };
 
   // Primero aplicar includePatterns (si hay alguno)
   // Si no hay includePatterns, se mantienen todas las URLs
   let urlsAfterIncludeStep = urls;
   if (includes.length > 0) {
     urlsAfterIncludeStep = urls.filter((url) =>
-      includes.some((pattern) => url.includes(pattern)),
+      includes.some((pattern) => matchesPattern(url, pattern)),
     );
   }
   const urlsAfterInclude = urlsAfterIncludeStep.length;
@@ -261,11 +275,11 @@ export function filterUrls(
     );
   }
 
-  // Luego aplicar excludePatterns sobre el subconjunto
+  // Luego aplicar excludePatterns sobre el subconjunto filtrado por include
   let finalUrls = urlsAfterIncludeStep;
   if (excludes.length > 0) {
     finalUrls = urlsAfterIncludeStep.filter(
-      (url) => !excludes.some((pattern) => url.includes(pattern)),
+      (url) => !excludes.some((pattern) => matchesPattern(url, pattern)),
     );
   }
   const urlsAfterExclude = finalUrls.length;
